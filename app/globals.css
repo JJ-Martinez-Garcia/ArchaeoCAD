@@ -253,6 +253,31 @@ button {
   text-transform: none;
 }
 
+.language-switch {
+  height: 34px;
+  display: grid;
+  grid-template-columns: repeat(2, 34px);
+  border: 1px solid #344043;
+}
+
+.language-switch button {
+  color: #7f8987;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  font-size: 9px;
+  font-weight: 800;
+}
+
+.language-switch button + button {
+  border-left: 1px solid #344043;
+}
+
+.language-switch button.active {
+  color: #171714;
+  background: var(--ochre);
+}
+
 .primary-button,
 .secondary-button {
   min-height: 42px;

@@ -23,6 +23,8 @@ import {
 } from "./cad-core";
 import { RasterOptions, vectorizeRaster } from "./raster-vectorizer";
 
+const APP_VERSION = "v4";
+
 const copy = {
   es: {
     brandTag: "DIBUJO DE CAMPO",
@@ -439,14 +441,14 @@ export default function ArqueoCadMobile() {
       <input ref={rasterInputRef} className="sr-only" type="file" accept="image/png,image/jpeg,image/webp,image/bmp" onChange={onRasterInput} />
 
       <header className="topbar">
-        <div className="brand-block"><div className="brand-mark" aria-hidden="true"><span>A</span></div><div><strong>ArqueoCAD</strong><small>{t.brandTag}</small></div></div>
+        <div className="brand-block"><div className="brand-mark" aria-hidden="true"><span>A</span></div><div><strong>ArqueoCAD</strong><small>{t.brandTag} · {APP_VERSION}</small></div></div>
         <div className="file-summary" title={drawing?.name ?? t.noDrawing}>
           <span className="format-badge">{drawing ? (drawing.format === "RASTER" ? "IMG" : drawing.format) : "—"}</span>
           <div><strong>{drawing?.name ?? t.noDrawing}</strong><small>{drawing ? `${drawing.primitives.length.toLocaleString(lang)} ${t.entities} · ${drawing.layers.length} ${t.layers.toLowerCase()} · ${drawing.unit}` : t.noDrawingMeta}</small></div>
         </div>
         <div className="top-actions">
           <span className="privacy-note"><span className="status-dot" />{t.local}</span>
-          <label className="language-picker"><span>{t.chooseLanguage}</span><select value={lang} onChange={(event) => setLang(event.target.value as "es" | "en")} aria-label={t.chooseLanguage}><option value="es">ES · Español</option><option value="en">EN · English</option></select></label>
+          <div className="language-switch" role="group" aria-label={t.chooseLanguage}><button className={lang === "es" ? "active" : ""} onClick={() => setLang("es")} aria-pressed={lang === "es"}>ES</button><button className={lang === "en" ? "active" : ""} onClick={() => setLang("en")} aria-pressed={lang === "en"}>EN</button></div>
           <button className="primary-button compact" onClick={() => planInputRef.current?.click()}><span aria-hidden="true">＋</span>{t.open}</button>
         </div>
       </header>
