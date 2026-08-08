@@ -1277,6 +1277,60 @@ input:checked + .custom-check {
   line-height: 1.45;
 }
 
+.select-field {
+  display: grid;
+  grid-template-columns: 1fr minmax(120px, 42%);
+  align-items: center;
+  gap: 10px;
+  margin: 2px 0 14px;
+  color: #4c4d49;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.select-field select,
+.unit-output {
+  width: 100%;
+  height: 38px;
+  padding: 0 10px;
+  color: #383936;
+  background: #fffdf8;
+  border: 1px solid var(--line);
+  font-size: 11px;
+}
+
+.unit-output {
+  display: flex;
+  align-items: center;
+}
+
+.raster-option {
+  grid-template-columns: 18px 1fr;
+  place-items: initial;
+  align-items: start;
+  gap: 9px;
+  margin-top: 13px;
+  color: #4c4d49;
+  cursor: pointer;
+}
+
+.raster-option b,
+.raster-option small {
+  display: block;
+}
+
+.raster-option b {
+  font-size: 10px;
+}
+
+.raster-option small {
+  margin-top: 3px;
+  color: #969188;
+  font-size: 8px;
+  font-weight: 400;
+  line-height: 1.45;
+}
+
 .calibration-grid {
   display: grid;
   grid-template-columns: 1fr 88px;

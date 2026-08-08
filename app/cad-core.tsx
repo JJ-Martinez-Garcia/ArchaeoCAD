@@ -23,6 +23,8 @@ export type Primitive = {
   text?: string;
   height?: number;
   rotation?: number;
+  lineType?: "continuous" | "dashed";
+  lineWeight?: number;
 };
 export type Layer = {
   name: string;
@@ -31,6 +33,8 @@ export type Layer = {
   selected: boolean;
   count: number;
   auxiliary?: boolean;
+  lineType?: "continuous" | "dashed";
+  lineWeight?: number;
 };
 export type Drawing = {
   name: string;
@@ -411,12 +415,13 @@ function escapeXml(value: string) {
 
 export function toSvg(primitives: Primitive[], title: string) {
   const bounds = getBounds(primitives);
-  const sw = Math.max(bounds.width, bounds.height) / 900;
+  const sw = Math.max(bounds.width, bounds.height) / 1600;
   const y = (value: number) => bounds.maxY - value + bounds.minY;
   const body = primitives.map((entity) => {
     const color = entity.color?.toLowerCase() === "#ffffff" || entity.color?.toLowerCase() === "#f1efe8" ? "#111111" : entity.color ?? "#111111";
-    if (entity.type === "polyline" && entity.points) return `<polyline points="${entity.points.map((point) => `${point.x},${y(point.y)}`).join(" ")}" fill="none" stroke="${color}" stroke-width="${sw}"${entity.closed ? ' stroke-linejoin="round"' : ""}/>`;
-    if (entity.type === "circle" && entity.center) return `<circle cx="${entity.center.x}" cy="${y(entity.center.y)}" r="${entity.radius ?? 1}" fill="none" stroke="${color}" stroke-width="${sw}"/>`;
+    const dash = entity.lineType === "dashed" ? ` stroke-dasharray="${sw * 8} ${sw * 5}"` : "";
+    if (entity.type === "polyline" && entity.points) return `<polyline points="${entity.points.map((point) => `${point.x},${y(point.y)}`).join(" ")}" fill="none" stroke="${color}" stroke-width="${sw}"${dash}${entity.closed ? ' stroke-linejoin="round"' : ""}/>`;
+    if (entity.type === "circle" && entity.center) return `<circle cx="${entity.center.x}" cy="${y(entity.center.y)}" r="${entity.radius ?? 1}" fill="none" stroke="${color}" stroke-width="${sw}"${dash}/>`;
     if (entity.type === "point" && entity.center) return `<circle cx="${entity.center.x}" cy="${y(entity.center.y)}" r="${sw * 2.2}" fill="${color}"/>`;
     if (entity.type === "text" && entity.center) return `<text x="${entity.center.x}" y="${y(entity.center.y)}" font-family="sans-serif" font-size="${entity.height ?? 1}" fill="${color}">${escapeXml(entity.text ?? "")}</text>`;
     return "";
@@ -426,15 +431,37 @@ export function toSvg(primitives: Primitive[], title: string) {
 
 export function toDxf(primitives: Primitive[], unit: string) {
   const unitCode = unit === "metros" ? "6" : unit === "centímetros" ? "5" : unit === "milímetros" ? "4" : "0";
-  const out: string[] = ["0", "SECTION", "2", "HEADER", "9", "$INSUNITS", "70", unitCode, "0", "ENDSEC", "0", "SECTION", "2", "ENTITIES"];
+  const layerColors: Record<string, number> = {
+    "01_ESTRUCTURAS": 1,
+    "01_LINEAS_VECTOR": 7,
+    "02_CURVAS_NIVEL": 3,
+    "03_ANOTACIONES": 5,
+    "04_EJES_SECCIONES": 6,
+    "05_TRAMAS": 30,
+    "06_SIMBOLOS": 4,
+    "07_ESCALA_NORTE": 2,
+  };
+  const layerNames = [...new Set(primitives.map((entity) => entity.layer))].sort();
+  const layerStyle = (name: string) => primitives.find((entity) => entity.layer === name);
+  const out: string[] = ["0", "SECTION", "2", "HEADER", "9", "$INSUNITS", "70", unitCode, "0", "ENDSEC", "0", "SECTION", "2", "TABLES"];
   const add = (...values: (string | number)[]) => values.forEach((value) => out.push(String(value)));
+  add(0, "TABLE", 2, "LTYPE", 70, 2);
+  add(0, "LTYPE", 2, "CONTINUOUS", 70, 0, 3, "Solid line", 72, 65, 73, 0, 40, 0);
+  add(0, "LTYPE", 2, "DASHED_ARCH", 70, 0, 3, "Archaeological section axes", 72, 65, 73, 2, 40, 7.5, 49, 4.5, 74, 0, 49, -3, 74, 0);
+  add(0, "ENDTAB", 0, "TABLE", 2, "LAYER", 70, layerNames.length);
+  layerNames.forEach((name) => {
+    const style = layerStyle(name);
+    add(0, "LAYER", 2, name, 70, 0, 62, layerColors[name] ?? 7, 6, style?.lineType === "dashed" ? "DASHED_ARCH" : "CONTINUOUS", 370, style?.lineWeight ?? 5);
+  });
+  add(0, "ENDTAB", 0, "ENDSEC", 0, "SECTION", 2, "ENTITIES");
   primitives.forEach((entity) => {
+    const common: (string | number)[] = [8, entity.layer, 6, entity.lineType === "dashed" ? "DASHED_ARCH" : "BYLAYER", 370, entity.lineWeight ?? -1];
     if (entity.type === "polyline" && entity.points?.length) {
-      add(0, "LWPOLYLINE", 8, entity.layer, 90, entity.points.length, 70, entity.closed ? 1 : 0);
+      add(0, "LWPOLYLINE", ...common, 90, entity.points.length, 70, entity.closed ? 1 : 0);
       entity.points.forEach((point) => add(10, point.x, 20, point.y));
-    } else if (entity.type === "circle" && entity.center) add(0, "CIRCLE", 8, entity.layer, 10, entity.center.x, 20, entity.center.y, 40, entity.radius ?? 1);
-    else if (entity.type === "point" && entity.center) add(0, "POINT", 8, entity.layer, 10, entity.center.x, 20, entity.center.y);
-    else if (entity.type === "text" && entity.center) add(0, "TEXT", 8, entity.layer, 10, entity.center.x, 20, entity.center.y, 40, entity.height ?? 1, 1, entity.text ?? "");
+    } else if (entity.type === "circle" && entity.center) add(0, "CIRCLE", ...common, 10, entity.center.x, 20, entity.center.y, 40, entity.radius ?? 1);
+    else if (entity.type === "point" && entity.center) add(0, "POINT", ...common, 10, entity.center.x, 20, entity.center.y);
+    else if (entity.type === "text" && entity.center) add(0, "TEXT", ...common, 10, entity.center.x, 20, entity.center.y, 40, entity.height ?? 1, 1, entity.text ?? "");
   });
   add(0, "ENDSEC", 0, "EOF");
   return out.join("\r\n") + "\r\n";

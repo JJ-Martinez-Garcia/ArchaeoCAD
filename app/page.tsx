@@ -23,7 +23,7 @@ import {
 } from "./cad-core";
 import { RasterOptions, vectorizeRaster } from "./raster-vectorizer";
 
-const APP_VERSION = "v4";
+const APP_VERSION = "v5";
 
 const copy = {
   es: {
@@ -99,10 +99,19 @@ const copy = {
     thresholdHelp: "Sube el valor para recuperar trazos claros; bájalo para eliminar sombras.",
     simplify: "Simplificación",
     simplifyHelp: "Más simplificación produce menos puntos y líneas más limpias.",
+    detail: "Nivel de detalle",
+    detailHigh: "Máximo",
+    detailBalanced: "Equilibrado",
+    detailFast: "Rápido",
+    classify: "Clasificar por tipos de línea",
+    classifyHelp: "Separa estructuras, curvas de nivel, ejes, tramas, símbolos y escala en capas.",
     calibration: "Escala real (opcional)",
     realWidth: "Ancho real de la imagen",
     widthPlaceholder: "Ej. 25",
     noCalibration: "Déjalo vacío si la imagen no tiene una escala conocida.",
+    detectScale: "Detectar barra gráfica",
+    scaleLength: "Longitud representada",
+    scaleHelp: "Si existe una barra de escala en la parte inferior, úsala para calibrar automáticamente.",
     unit: "Unidad",
     process: "Generar geometría",
     processing: "Adelgazando y siguiendo trazos…",
@@ -185,10 +194,19 @@ const copy = {
     thresholdHelp: "Raise it to recover faint lines; lower it to remove shadows.",
     simplify: "Simplification",
     simplifyHelp: "More simplification means fewer points and cleaner lines.",
+    detail: "Detail level",
+    detailHigh: "Maximum",
+    detailBalanced: "Balanced",
+    detailFast: "Fast",
+    classify: "Classify line types",
+    classifyHelp: "Separates structures, contours, axes, hatching, symbols and scale into layers.",
     calibration: "Real scale (optional)",
     realWidth: "Real image width",
     widthPlaceholder: "E.g. 25",
     noCalibration: "Leave this blank if the image has no known scale.",
+    detectScale: "Detect graphic scale",
+    scaleLength: "Represented length",
+    scaleHelp: "When a scale bar exists near the bottom, use it for automatic calibration.",
     unit: "Unit",
     process: "Generate geometry",
     processing: "Thinning and tracing lines…",
@@ -212,6 +230,8 @@ function warningText(value: string, lang: "es" | "en") {
   if (complex) return `${complex[1]} complex entities are shown in simplified form; use the desktop application when the original CAD structure must be preserved.`;
   if (value.startsWith("El SVG no declara capas")) return "The SVG does not declare Inkscape layers; its groups were used as working layers.";
   if (value.startsWith("La geometría procede de una imagen")) return "This geometry was inferred from an image and should be reviewed before it is used as final documentation.";
+  if (value.startsWith("Las capas se han clasificado automáticamente")) return "Layers were classified automatically using shape, continuity, orientation and density; ambiguous elements should be reviewed.";
+  if (value.startsWith("Escala calibrada automáticamente")) return value.replace("Escala calibrada automáticamente con una barra gráfica de", "Scale calibrated automatically with a graphic scale of").replace("metros", "metres").replace("centímetros", "centimetres").replace("milímetros", "millimetres");
   if (value.startsWith("La imagen no se ha calibrado")) return "The image was not calibrated: measurements are shown in pixels/drawing units.";
   return value;
 }
@@ -232,8 +252,12 @@ export default function ArqueoCadMobile() {
   const [toast, setToast] = useState("");
   const [dwgOpen, setDwgOpen] = useState(false);
   const [rasterJob, setRasterJob] = useState<RasterJob | null>(null);
-  const [threshold, setThreshold] = useState(150);
-  const [simplify, setSimplify] = useState(1.5);
+  const [threshold, setThreshold] = useState(165);
+  const [simplify, setSimplify] = useState(0.6);
+  const [detail, setDetail] = useState<RasterOptions["detail"]>(3);
+  const [classifyLines, setClassifyLines] = useState(true);
+  const [detectScale, setDetectScale] = useState(true);
+  const [scaleBarLength, setScaleBarLength] = useState("8");
   const [realWidth, setRealWidth] = useState("");
   const [rasterUnit, setRasterUnit] = useState<RasterOptions["unit"]>("m");
   const [vectorizing, setVectorizing] = useState(false);
@@ -271,7 +295,7 @@ export default function ArqueoCadMobile() {
   const viewX = bounds.minX + (bounds.width - viewWidth) / 2 + pan.x;
   const viewY = bounds.minY + (bounds.height - viewHeight) / 2 + pan.y;
   const sy = (value: number) => bounds.maxY - value + bounds.minY;
-  const strokeWidth = Math.max(bounds.width, bounds.height) / 720 / zoom;
+  const strokeWidth = Math.max(bounds.width, bounds.height) / 1200 / zoom;
 
   function resetView() {
     setZoom(1);
@@ -290,8 +314,12 @@ export default function ArqueoCadMobile() {
   function openRaster(file: File) {
     if (rasterJob) URL.revokeObjectURL(rasterJob.url);
     setRasterJob({ file, url: URL.createObjectURL(file) });
-    setThreshold(150);
-    setSimplify(1.5);
+    setThreshold(165);
+    setSimplify(0.6);
+    setDetail(3);
+    setClassifyLines(true);
+    setDetectScale(true);
+    setScaleBarLength("8");
     setRealWidth("");
   }
 
@@ -346,6 +374,9 @@ export default function ArqueoCadMobile() {
         simplify,
         realWidth: Number(realWidth) > 0 ? Number(realWidth) : null,
         unit: rasterUnit,
+        detail,
+        classify: classifyLines,
+        scaleBarLength: detectScale && Number(scaleBarLength) > 0 ? Number(scaleBarLength) : null,
       });
       closeRaster();
       loadDrawing(next);
@@ -474,8 +505,9 @@ export default function ArqueoCadMobile() {
             <div className={`drawing-board ${measureMode ? "measuring" : ""}`}><div className="grid-overlay" /><svg ref={svgRef} className="cad-canvas" viewBox={`${viewX} ${viewY} ${viewWidth} ${viewHeight}`} preserveAspectRatio="xMidYMid meet" onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} onPointerCancel={() => { dragRef.current = null; }} onWheel={onWheel} role="img" aria-label={`${drawing.name}, ${drawing.layers.length} ${t.layers.toLowerCase()}`}>
               {visiblePrimitives.map((entity) => {
                 const color = entity.color ?? drawing.layers.find((layer) => layer.name === entity.layer)?.color ?? "#ece8dd";
-                if (entity.type === "polyline" && entity.points?.length) return <polyline key={entity.id} points={entity.points.map((point) => `${point.x},${sy(point.y)}`).join(" ")} fill="none" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" opacity="0.9" />;
-                if (entity.type === "circle" && entity.center) return <circle key={entity.id} cx={entity.center.x} cy={sy(entity.center.y)} r={entity.radius ?? 1} fill="none" stroke={color} strokeWidth={strokeWidth} opacity="0.9" />;
+                const dash = entity.lineType === "dashed" ? `${strokeWidth * 8} ${strokeWidth * 5}` : undefined;
+                if (entity.type === "polyline" && entity.points?.length) return <polyline key={entity.id} points={entity.points.map((point) => `${point.x},${sy(point.y)}`).join(" ")} fill="none" stroke={color} strokeWidth={strokeWidth} strokeDasharray={dash} strokeLinecap="round" strokeLinejoin="round" opacity="0.9" />;
+                if (entity.type === "circle" && entity.center) return <circle key={entity.id} cx={entity.center.x} cy={sy(entity.center.y)} r={entity.radius ?? 1} fill="none" stroke={color} strokeWidth={strokeWidth} strokeDasharray={dash} opacity="0.9" />;
                 if (entity.type === "point" && entity.center) return <circle key={entity.id} cx={entity.center.x} cy={sy(entity.center.y)} r={strokeWidth * 2.3} fill={color} />;
                 if (entity.type === "text" && entity.center) return <text key={entity.id} x={entity.center.x} y={sy(entity.center.y)} fill={color} fontSize={entity.height ?? 1} fontFamily="ui-monospace, monospace" transform={`rotate(${-(entity.rotation ?? 0)} ${entity.center.x} ${sy(entity.center.y)})`}>{entity.text}</text>;
                 return null;
@@ -501,7 +533,7 @@ export default function ArqueoCadMobile() {
 
       {exportOpen && drawing && <div className="modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) setExportOpen(false); }}><section className="export-modal" role="dialog" aria-modal="true" aria-labelledby="export-title"><div className="modal-heading"><div><span className="eyebrow">{drawing.name}</span><h2 id="export-title">{t.exportTitle}</h2></div><button onClick={() => setExportOpen(false)} aria-label={t.close}>×</button></div><div className="export-summary"><span className="file-stack">▧</span><div><strong>{selectedCount} {t.layers.toLowerCase()}</strong><small>{drawing.primitives.filter((entity) => drawing.layers.find((layer) => layer.name === entity.layer)?.selected).length} {t.prepared}</small></div></div><fieldset><legend>{t.organisation}</legend><label className={exportMode === "layers" ? "choice selected" : "choice"}><input type="radio" name="mode" checked={exportMode === "layers"} onChange={() => setExportMode("layers")} /><span className="radio-dot" /><div><strong>{t.perLayer}</strong><small>{selectedCount} × {Number(exportFormats.dxf) + Number(exportFormats.svg)} {t.files}</small></div></label><label className={exportMode === "filtered" ? "choice selected" : "choice"}><input type="radio" name="mode" checked={exportMode === "filtered"} onChange={() => setExportMode("filtered")} /><span className="radio-dot" /><div><strong>{t.filtered}</strong><small>{t.keepTogether}</small></div></label></fieldset><fieldset><legend>{t.outputs}</legend><div className="format-grid"><label className={exportFormats.dxf ? "format-choice selected" : "format-choice"}><input type="checkbox" checked={exportFormats.dxf} onChange={() => setExportFormats((value) => ({ ...value, dxf: !value.dxf }))} /><span>DXF</span><small>{t.editable}</small></label><label className={exportFormats.svg ? "format-choice selected" : "format-choice"}><input type="checkbox" checked={exportFormats.svg} onChange={() => setExportFormats((value) => ({ ...value, svg: !value.svg }))} /><span>SVG</span><small>{t.inkscape}</small></label></div></fieldset><label className="option-line"><input type="checkbox" defaultChecked /><span className="custom-check">✓</span>{t.blocks}</label><label className="option-line"><input type="checkbox" /><span className="custom-check">✓</span>{t.auxiliary}</label><div className="modal-actions"><button className="secondary-button" onClick={() => setExportOpen(false)}>{t.cancel}</button><button className="primary-button" onClick={createExport} disabled={!selectedCount || (!exportFormats.dxf && !exportFormats.svg)}><span>⇩</span>{t.download}</button></div></section></div>}
 
-      {rasterJob && <div className="modal-backdrop"><section className="raster-modal" role="dialog" aria-modal="true" aria-labelledby="raster-title"><div className="modal-heading"><div><span className="eyebrow">{rasterJob.file.name}</span><h2 id="raster-title">{t.rasterTitle}</h2></div><button onClick={closeRaster} aria-label={t.close}>×</button></div><p className="raster-intro">{t.rasterIntro}</p><div className="raster-layout"><div><span className="field-label">{t.sourceImage}</span><div className="raster-preview"><img src={rasterJob.url} alt={rasterJob.file.name} style={{ filter: `grayscale(1) contrast(${1 + threshold / 90})` }} /><span>{t.rasterFeature}</span></div><div className="raster-feature"><b>⌁</b><p><strong>{t.rasterFeature}</strong>{t.rasterFeatureBody}</p></div></div><div className="raster-controls"><fieldset><legend>{t.detection}</legend><label className="range-field"><span><b>{t.threshold}</b><output>{threshold}</output></span><input type="range" min="70" max="230" value={threshold} onChange={(event) => setThreshold(Number(event.target.value))} /><small>{t.thresholdHelp}</small></label><label className="range-field"><span><b>{t.simplify}</b><output>{simplify.toFixed(1)}</output></span><input type="range" min="0.5" max="5" step="0.5" value={simplify} onChange={(event) => setSimplify(Number(event.target.value))} /><small>{t.simplifyHelp}</small></label></fieldset><fieldset><legend>{t.calibration}</legend><div className="calibration-grid"><label><span>{t.realWidth}</span><input type="number" min="0" step="any" value={realWidth} onChange={(event) => setRealWidth(event.target.value)} placeholder={t.widthPlaceholder} /></label><label><span>{t.unit}</span><select value={rasterUnit} onChange={(event) => setRasterUnit(event.target.value as RasterOptions["unit"])}><option value="m">m</option><option value="cm">cm</option><option value="mm">mm</option><option value="unit">u</option></select></label></div><small>{t.noCalibration}</small></fieldset></div></div><div className="modal-actions"><button className="secondary-button" onClick={closeRaster} disabled={vectorizing}>{t.cancel}</button><button className="primary-button" onClick={() => void runVectorizer()} disabled={vectorizing}>{vectorizing ? <><span className="spinner" />{t.processing}</> : <>⌁ {t.process}</>}</button></div></section></div>}
+      {rasterJob && <div className="modal-backdrop"><section className="raster-modal" role="dialog" aria-modal="true" aria-labelledby="raster-title"><div className="modal-heading"><div><span className="eyebrow">{rasterJob.file.name}</span><h2 id="raster-title">{t.rasterTitle}</h2></div><button onClick={closeRaster} aria-label={t.close}>×</button></div><p className="raster-intro">{t.rasterIntro}</p><div className="raster-layout"><div><span className="field-label">{t.sourceImage}</span><div className="raster-preview"><img src={rasterJob.url} alt={rasterJob.file.name} style={{ filter: `grayscale(1) contrast(${1 + threshold / 90})` }} /><span>{t.rasterFeature}</span></div><div className="raster-feature"><b>⌁</b><p><strong>{t.rasterFeature}</strong>{t.rasterFeatureBody}</p></div></div><div className="raster-controls"><fieldset><legend>{t.detection}</legend><label className="range-field"><span><b>{t.threshold}</b><output>{threshold}</output></span><input type="range" min="70" max="230" value={threshold} onChange={(event) => setThreshold(Number(event.target.value))} /><small>{t.thresholdHelp}</small></label><label className="range-field"><span><b>{t.simplify}</b><output>{simplify.toFixed(1)}</output></span><input type="range" min="0.2" max="3" step="0.2" value={simplify} onChange={(event) => setSimplify(Number(event.target.value))} /><small>{t.simplifyHelp}</small></label><label className="select-field"><span>{t.detail}</span><select value={detail} onChange={(event) => setDetail(Number(event.target.value) as RasterOptions["detail"])}><option value="3">{t.detailHigh}</option><option value="2">{t.detailBalanced}</option><option value="1">{t.detailFast}</option></select></label><label className="option-line raster-option"><input type="checkbox" checked={classifyLines} onChange={() => setClassifyLines((value) => !value)} /><span className="custom-check">✓</span><span><b>{t.classify}</b><small>{t.classifyHelp}</small></span></label></fieldset><fieldset><legend>{t.calibration}</legend><div className="calibration-grid"><label><span>{t.realWidth}</span><input type="number" min="0" step="any" value={realWidth} onChange={(event) => setRealWidth(event.target.value)} placeholder={t.widthPlaceholder} /></label><label><span>{t.unit}</span><select value={rasterUnit} onChange={(event) => setRasterUnit(event.target.value as RasterOptions["unit"])}><option value="m">m</option><option value="cm">cm</option><option value="mm">mm</option><option value="unit">u</option></select></label></div><small>{t.noCalibration}</small><label className="option-line raster-option"><input type="checkbox" checked={detectScale} onChange={() => setDetectScale((value) => !value)} /><span className="custom-check">✓</span><span><b>{t.detectScale}</b><small>{t.scaleHelp}</small></span></label>{detectScale && <div className="calibration-grid"><label><span>{t.scaleLength}</span><input type="number" min="0" step="any" value={scaleBarLength} onChange={(event) => setScaleBarLength(event.target.value)} /></label><label><span>{t.unit}</span><output className="unit-output">{rasterUnit === "unit" ? "u" : rasterUnit}</output></label></div>}</fieldset></div></div><div className="modal-actions"><button className="secondary-button" onClick={closeRaster} disabled={vectorizing}>{t.cancel}</button><button className="primary-button" onClick={() => void runVectorizer()} disabled={vectorizing}>{vectorizing ? <><span className="spinner" />{t.processing}</> : <>⌁ {t.process}</>}</button></div></section></div>}
 
       {dwgOpen && <div className="modal-backdrop"><section className="export-modal small-modal" role="dialog" aria-modal="true"><div className="dwg-symbol">DWG</div><h2>{t.dwgTitle}</h2><p>{t.dwgBody}</p><a className="primary-button" href="https://www.opendesign.com/guestfiles/oda_file_converter" target="_blank" rel="noreferrer">ODA File Converter</a><button className="secondary-button" onClick={() => setDwgOpen(false)}>{t.cancel}</button></section></div>}
       {draggingFile && <div className="drop-overlay"><div><span>＋</span><h2>{t.drop}</h2><p>{t.dropFormats}</p></div></div>}
