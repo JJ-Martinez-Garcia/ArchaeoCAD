@@ -22,6 +22,8 @@ test("ships ArqueoCAD as a bilingual installable mobile application", async () =
   assert.match(page, /src="\/og\.png"/);
   assert.match(page, /useState<Drawing \| null>\(null\)/);
   assert.match(page, /image\/png,image\/jpeg,image\/webp,image\/bmp/);
+  assert.match(page, /Este es un software gratuito y de libre distribución creado por José Javier Martínez/);
+  assert.match(page, /https:\/\/josejaviermartinez\.com\//);
   assert.match(vectorizer, /function thin/);
   assert.match(vectorizer, /tracePaths/);
   assert.match(vectorizer, /VECTOR_RASTER/);

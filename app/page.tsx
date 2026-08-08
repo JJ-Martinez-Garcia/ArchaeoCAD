@@ -108,6 +108,7 @@ const copy = {
     noLines: "No se han detectado líneas. Prueba a subir el umbral.",
     rasterFeature: "Adelgazado de trazo",
     rasterFeatureBody: "Busca el eje central para evitar las dobles líneas típicas de la vectorización por contornos.",
+    footerText: "Este es un software gratuito y de libre distribución creado por José Javier Martínez.",
   },
   en: {
     brandTag: "FIELD DRAWING",
@@ -193,6 +194,7 @@ const copy = {
     noLines: "No lines were detected. Try raising the threshold.",
     rasterFeature: "Centre-line thinning",
     rasterFeatureBody: "Finds the centre of each stroke to avoid the double lines produced by contour tracing.",
+    footerText: "This is free, freely distributable software created by José Javier Martínez.",
   },
 } as const;
 
@@ -488,6 +490,8 @@ export default function ArqueoCadMobile() {
           </aside>
         </>}
       </section>
+
+      <footer className="license-footer"><span>{t.footerText}</span><a href="https://josejaviermartinez.com/" target="_blank" rel="noreferrer">josejaviermartinez.com</a></footer>
 
       <nav className="mobile-nav" aria-label={t.mobileTools}><button onClick={() => planInputRef.current?.click()}><span>＋</span>{t.openShort}</button><button onClick={() => rasterInputRef.current?.click()}><span>▧</span>{t.vectorizeShort}</button><button disabled={!drawing} className={activePanel === "layers" ? "active" : ""} onClick={() => setActivePanel(activePanel === "layers" ? null : "layers")}><span>▤</span>{t.layers}</button><button disabled={!drawing} className={measureMode ? "measure-fab active" : "measure-fab"} onClick={() => { setMeasureMode((value) => !value); setActivePanel(null); }}><span>⌁</span>{t.measure}</button><button disabled={!drawing} onClick={() => setActivePanel(activePanel === "warnings" ? null : "warnings")}><span>!</span>{t.warnings}</button><button disabled={!drawing} onClick={() => setExportOpen(true)}><span>⇩</span>{t.export}</button></nav>
 
