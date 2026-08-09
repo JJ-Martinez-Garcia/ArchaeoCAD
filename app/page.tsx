@@ -23,7 +23,9 @@ import {
 } from "./cad-core";
 import { RasterOptions, vectorizeRaster } from "./raster-vectorizer";
 
-const APP_VERSION = "v5";
+const APP_VERSION = "v6";
+
+type Lang = "es" | "en" | "ar";
 
 const copy = {
   es: {
@@ -216,6 +218,101 @@ const copy = {
     rasterFeatureBody: "Finds the centre of each stroke to avoid the double lines produced by contour tracing.",
     footerText: "This is free, freely distributable software created by José Javier Martínez.",
   },
+  ar: {
+    brandTag: "الرسم الميداني",
+    open: "فتح مخطط",
+    openShort: "فتح",
+    vectorize: "تحويل صورة إلى متجهات",
+    vectorizeShort: "صورة",
+    layers: "الطبقات",
+    measure: "قياس",
+    export: "تصدير",
+    warnings: "تنبيهات",
+    fit: "ملاءمة العرض",
+    noDrawing: "لم يتم فتح مخطط",
+    noDrawingMeta: "DXF أو DWG أو SVG أو صورة نقطية",
+    local: "تتم معالجة الملف على هذا الجهاز فقط",
+    coverEyebrow: "المخططات الأثرية",
+    coverTitle: "من الميدان إلى مخطط منظم في طبقات.",
+    coverBody: "افتح ملف DXF أو SVG، أو حوّل صورة ممسوحة ضوئياً إلى هندسة قابلة للتحرير. قِس كل طبقة وراجعها وجهّزها من هاتفك.",
+    coverFormats: "DXF · SVG · PNG · JPG · WEBP",
+    privateNote: "خصوصية مدمجة: لا تغادر مخططاتك هذا الجهاز.",
+    chooseLanguage: "اللغة",
+    drawing: "المخطط",
+    content: "محتوى المخطط",
+    quality: "مراقبة الجودة",
+    entities: "عناصر",
+    selected: "محددة",
+    visible: "ظاهرة",
+    auxiliaryLabel: "مساعدة",
+    search: "البحث عن طبقة…",
+    all: "الكل",
+    none: "لا شيء",
+    layerHelp: "رمز العين يتحكم في العرض، ومربع الاختيار يحدد ما يتم تصديره.",
+    noWarnings: "لا توجد تنبيهات في هذا المخطط.",
+    ready: "المخطط جاهز",
+    drop: "أفلت الملف هنا",
+    dropFormats: "DXF أو DWG أو SVG أو صورة · حتى 50 ميغابايت",
+    fileError: "تعذرت قراءة هذا الملف.",
+    fileLarge: "يتجاوز الملف الحد الأقصى البالغ 50 ميغابايت.",
+    measureHint: "المس نقاطاً على المخطط",
+    clear: "مسح",
+    undo: "تراجع",
+    length: "الطول",
+    perimeter: "المحيط",
+    area: "المساحة",
+    azimuth: "السمت",
+    hide: "إخفاء",
+    show: "إظهار",
+    close: "إغلاق",
+    mobileTools: "أدوات الهاتف",
+    exportTitle: "إعداد الملفات",
+    organisation: "التنظيم",
+    perLayer: "ملف لكل طبقة",
+    filtered: "مخطط واحد للعناصر المحددة",
+    keepTogether: "يجمع الطبقات المختارة في ملف واحد",
+    files: "ملفات",
+    outputs: "صيغ الإخراج",
+    editable: "CAD قابل للتحرير",
+    inkscape: "Inkscape والويب",
+    blocks: "تفكيك الكتل عندما يكون ذلك ممكناً",
+    auxiliary: "تضمين الطبقات المساعدة",
+    download: "إنشاء حزمة ZIP",
+    cancel: "إلغاء",
+    prepared: "عناصر جاهزة",
+    generated: "ملفات جاهزة",
+    dwgTitle: "يحتاج DWG إلى تحويل",
+    dwgBody: "على الهاتف، حوّل الملف أولاً إلى DXF للحفاظ على الهندسة دون تفسير صيغة مملوكة داخل المتصفح.",
+    rasterTitle: "تحويل صورة نقطية إلى متجهات",
+    rasterIntro: "حوّل خطوط صورة ممسوحة ضوئياً أو فوتوغرافية إلى مسارات مركزية قابلة للتحرير. يجب دائماً مراجعة النتيجة.",
+    sourceImage: "الصورة الأصلية",
+    detection: "الاكتشاف",
+    threshold: "عتبة اللون الأسود",
+    thresholdHelp: "ارفع القيمة لاستعادة الخطوط الباهتة، واخفضها لإزالة الظلال.",
+    simplify: "التبسيط",
+    simplifyHelp: "زيادة التبسيط تقلل عدد النقاط وتنتج خطوطاً أنظف.",
+    detail: "مستوى التفاصيل",
+    detailHigh: "أقصى",
+    detailBalanced: "متوازن",
+    detailFast: "سريع",
+    classify: "تصنيف أنواع الخطوط",
+    classifyHelp: "يفصل المنشآت وخطوط الكنتور والمحاور والتهشير والرموز والمقياس في طبقات.",
+    calibration: "المقياس الحقيقي (اختياري)",
+    realWidth: "العرض الحقيقي للصورة",
+    widthPlaceholder: "مثال: 25",
+    noCalibration: "اتركه فارغاً إذا لم يكن للصورة مقياس معروف.",
+    detectScale: "اكتشاف شريط المقياس",
+    scaleLength: "الطول المُمثّل",
+    scaleHelp: "إذا وُجد شريط مقياس أسفل الصورة، فاستخدمه للمعايرة التلقائية.",
+    unit: "الوحدة",
+    process: "إنشاء الهندسة",
+    processing: "ترقيق الخطوط وتتبعها…",
+    rasterReady: "تم تحويل الصورة إلى متجهات",
+    noLines: "لم يتم اكتشاف خطوط. جرّب رفع قيمة العتبة.",
+    rasterFeature: "ترقيق الخط المركزي",
+    rasterFeatureBody: "يحدد مركز كل خط لتجنب الخطوط المزدوجة الناتجة عن تتبع الحدود.",
+    footerText: "هذا برنامج مجاني وحرّ التوزيع أنشأه خوسيه خافيير مارتينيث.",
+  },
 } as const;
 
 type RasterJob = { file: File; url: string };
@@ -224,9 +321,18 @@ function isRaster(extension?: string) {
   return ["png", "jpg", "jpeg", "webp", "bmp"].includes(extension ?? "");
 }
 
-function warningText(value: string, lang: "es" | "en") {
+function warningText(value: string, lang: Lang) {
   if (lang === "es") return value;
   const complex = value.match(/^(\d+) entidades complejas/);
+  if (lang === "ar") {
+    if (complex) return `يتم عرض ${complex[1]} من العناصر المعقدة بصورة مبسطة؛ استخدم تطبيق سطح المكتب عندما يلزم الحفاظ على بنية CAD الأصلية.`;
+    if (value.startsWith("El SVG no declara capas")) return "لا يعرّف ملف SVG طبقات Inkscape؛ استُخدمت مجموعاته كطبقات عمل.";
+    if (value.startsWith("La geometría procede de una imagen")) return "تم استنتاج هذه الهندسة من صورة ويجب مراجعتها قبل استخدامها كتوثيق نهائي.";
+    if (value.startsWith("Las capas se han clasificado automáticamente")) return "صُنفت الطبقات تلقائياً حسب الشكل والاستمرارية والاتجاه والكثافة؛ يُنصح بمراجعة العناصر الملتبسة.";
+    if (value.startsWith("Escala calibrada automáticamente")) return "تمت معايرة المقياس تلقائياً باستخدام شريط المقياس الموجود في الصورة.";
+    if (value.startsWith("La imagen no se ha calibrado")) return "لم تتم معايرة الصورة: تظهر القياسات بالبكسل أو بوحدات الرسم.";
+    return value;
+  }
   if (complex) return `${complex[1]} complex entities are shown in simplified form; use the desktop application when the original CAD structure must be preserved.`;
   if (value.startsWith("El SVG no declara capas")) return "The SVG does not declare Inkscape layers; its groups were used as working layers.";
   if (value.startsWith("La geometría procede de una imagen")) return "This geometry was inferred from an image and should be reviewed before it is used as final documentation.";
@@ -237,7 +343,7 @@ function warningText(value: string, lang: "es" | "en") {
 }
 
 export default function ArqueoCadMobile() {
-  const [lang, setLang] = useState<"es" | "en">("es");
+  const [lang, setLang] = useState<Lang>("es");
   const [drawing, setDrawing] = useState<Drawing | null>(null);
   const [activePanel, setActivePanel] = useState<"layers" | "warnings" | null>(null);
   const [search, setSearch] = useState("");
@@ -273,6 +379,7 @@ export default function ArqueoCadMobile() {
 
   useEffect(() => {
     document.documentElement.lang = lang;
+    document.documentElement.dir = lang === "ar" ? "rtl" : "ltr";
   }, [lang]);
 
   useEffect(() => {
@@ -447,7 +554,7 @@ export default function ArqueoCadMobile() {
     const files: { name: string; content: string }[] = [];
     const groups = exportMode === "layers"
       ? chosenLayers.map((layer) => ({ suffix: safeName(layer.name), names: [layer.name] }))
-      : [{ suffix: lang === "es" ? "seleccion" : "selection", names: chosenLayers.map((layer) => layer.name) }];
+      : [{ suffix: lang === "es" ? "seleccion" : lang === "ar" ? "selection_ar" : "selection", names: chosenLayers.map((layer) => layer.name) }];
     groups.forEach((group) => {
       const names = new Set(group.names);
       const groupPrimitives = drawing.primitives.filter((entity) => names.has(entity.layer));
@@ -467,7 +574,7 @@ export default function ArqueoCadMobile() {
   }
 
   return (
-    <main className="app-shell" onDragOver={(event) => { event.preventDefault(); setDraggingFile(true); }} onDragLeave={() => setDraggingFile(false)} onDrop={(event) => { event.preventDefault(); setDraggingFile(false); const file = event.dataTransfer.files[0]; if (file) void readFile(file); }}>
+    <main className="app-shell" dir={lang === "ar" ? "rtl" : "ltr"} onDragOver={(event) => { event.preventDefault(); setDraggingFile(true); }} onDragLeave={() => setDraggingFile(false)} onDrop={(event) => { event.preventDefault(); setDraggingFile(false); const file = event.dataTransfer.files[0]; if (file) void readFile(file); }}>
       <input ref={planInputRef} className="sr-only" type="file" accept=".dxf,.dwg,.svg" onChange={onPlanInput} />
       <input ref={rasterInputRef} className="sr-only" type="file" accept="image/png,image/jpeg,image/webp,image/bmp" onChange={onRasterInput} />
 
@@ -479,7 +586,7 @@ export default function ArqueoCadMobile() {
         </div>
         <div className="top-actions">
           <span className="privacy-note"><span className="status-dot" />{t.local}</span>
-          <div className="language-switch" role="group" aria-label={t.chooseLanguage}><button className={lang === "es" ? "active" : ""} onClick={() => setLang("es")} aria-pressed={lang === "es"}>ES</button><button className={lang === "en" ? "active" : ""} onClick={() => setLang("en")} aria-pressed={lang === "en"}>EN</button></div>
+          <div className="language-switch" role="group" aria-label={t.chooseLanguage}><button className={lang === "es" ? "active" : ""} onClick={() => setLang("es")} aria-pressed={lang === "es"}>ES</button><button className={lang === "en" ? "active" : ""} onClick={() => setLang("en")} aria-pressed={lang === "en"}>EN</button><button className={lang === "ar" ? "active" : ""} onClick={() => setLang("ar")} aria-pressed={lang === "ar"}>AR</button></div>
           <button className="primary-button compact" onClick={() => planInputRef.current?.click()}><span aria-hidden="true">＋</span>{t.open}</button>
         </div>
       </header>
@@ -525,7 +632,7 @@ export default function ArqueoCadMobile() {
         </>}
       </section>
 
-      <footer className="license-footer"><span>{t.footerText}</span><a href="https://josejaviermartinez.com/" target="_blank" rel="noreferrer">josejaviermartinez.com</a></footer>
+      <footer className="license-footer"><span>{t.footerText}</span><a href="http://www.josejaviermartinez.com" target="_blank" rel="noreferrer">www.josejaviermartinez.com</a></footer>
 
       <nav className="mobile-nav" aria-label={t.mobileTools}><button onClick={() => planInputRef.current?.click()}><span>＋</span>{t.openShort}</button><button onClick={() => rasterInputRef.current?.click()}><span>▧</span>{t.vectorizeShort}</button><button disabled={!drawing} className={activePanel === "layers" ? "active" : ""} onClick={() => setActivePanel(activePanel === "layers" ? null : "layers")}><span>▤</span>{t.layers}</button><button disabled={!drawing} className={measureMode ? "measure-fab active" : "measure-fab"} onClick={() => { setMeasureMode((value) => !value); setActivePanel(null); }}><span>⌁</span>{t.measure}</button><button disabled={!drawing} onClick={() => setActivePanel(activePanel === "warnings" ? null : "warnings")}><span>!</span>{t.warnings}</button><button disabled={!drawing} onClick={() => setExportOpen(true)}><span>⇩</span>{t.export}</button></nav>
 

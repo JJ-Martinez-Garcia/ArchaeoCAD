@@ -4,7 +4,7 @@ import test from "node:test";
 
 const root = new URL("../", import.meta.url);
 
-test("ships ArqueoCAD as a bilingual installable mobile application", async () => {
+test("ships ArqueoCAD as a multilingual installable mobile application", async () => {
   const [page, vectorizer, layout, manifest, serviceWorker] = await Promise.all([
     readFile(new URL("app/page.tsx", root), "utf8"),
     readFile(new URL("app/raster-vectorizer.ts", root), "utf8"),
@@ -23,10 +23,13 @@ test("ships ArqueoCAD as a bilingual installable mobile application", async () =
   assert.match(page, /useState<Drawing \| null>\(null\)/);
   assert.match(page, /image\/png,image\/jpeg,image\/webp,image\/bmp/);
   assert.match(page, /Este es un software gratuito y de libre distribución creado por José Javier Martínez/);
-  assert.match(page, /https:\/\/josejaviermartinez\.com\//);
-  assert.match(page, /const APP_VERSION = "v5"/);
+  assert.match(page, /http:\/\/www\.josejaviermartinez\.com/);
+  assert.match(page, /const APP_VERSION = "v6"/);
   assert.match(page, /aria-pressed=\{lang === "es"\}>ES<\/button>/);
   assert.match(page, /aria-pressed=\{lang === "en"\}>EN<\/button>/);
+  assert.match(page, /aria-pressed=\{lang === "ar"\}>AR<\/button>/);
+  assert.match(page, /من الميدان إلى مخطط منظم في طبقات/);
+  assert.match(page, /document\.documentElement\.dir = lang === "ar" \? "rtl" : "ltr"/);
   assert.match(vectorizer, /function thin/);
   assert.match(vectorizer, /tracePaths/);
   assert.match(vectorizer, /adaptiveBinary/);

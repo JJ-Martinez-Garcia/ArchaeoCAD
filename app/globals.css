@@ -256,7 +256,8 @@ button {
 .language-switch {
   height: 34px;
   display: grid;
-  grid-template-columns: repeat(2, 34px);
+  grid-template-columns: repeat(3, 34px);
+  direction: ltr;
   border: 1px solid #344043;
 }
 
