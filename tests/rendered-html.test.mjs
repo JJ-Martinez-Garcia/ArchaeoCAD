@@ -24,7 +24,7 @@ test("ships ArqueoCAD as a multilingual installable mobile application", async (
   assert.match(page, /image\/png,image\/jpeg,image\/webp,image\/bmp/);
   assert.match(page, /Este es un software gratuito y de libre distribución creado por José Javier Martínez/);
   assert.match(page, /http:\/\/www\.josejaviermartinez\.com/);
-  assert.match(page, /const APP_VERSION = "v7"/);
+  assert.match(page, /const APP_VERSION = "v8"/);
   assert.match(page, /aria-pressed=\{lang === "es"\}>ES<\/button>/);
   assert.match(page, /aria-pressed=\{lang === "en"\}>EN<\/button>/);
   assert.match(page, /aria-pressed=\{lang === "ar"\}>AR<\/button>/);
@@ -33,6 +33,7 @@ test("ships ArqueoCAD as a multilingual installable mobile application", async (
   assert.match(page, /beforeinstallprompt/);
   assert.match(page, /installPrompt\.prompt/);
   assert.match(page, /Añadir a pantalla de inicio/);
+  assert.match(page, /no dentro de ChatGPT/);
   assert.match(vectorizer, /function thin/);
   assert.match(vectorizer, /tracePaths/);
   assert.match(vectorizer, /adaptiveBinary/);
@@ -42,8 +43,12 @@ test("ships ArqueoCAD as a multilingual installable mobile application", async (
   assert.match(vectorizer, /scaleBarLength/);
   assert.match(vectorizer, /must never be eroded/);
   assert.match(layout, /ArqueoCAD Mobile/);
+  assert.match(layout, /apple-mobile-web-app-capable/);
+  assert.match(layout, /apple-touch-icon\.png/);
   assert.doesNotMatch(layout, /codex-preview|Starter Project/);
   assert.match(manifest, /display: "standalone"/);
+  assert.match(manifest, /scope: "\/"/);
+  assert.match(manifest, /prefer_related_applications: false/);
   assert.match(manifest, /icon-192\.png/);
   assert.match(manifest, /icon-maskable-512\.png/);
   assert.match(serviceWorker, /CACHE_NAME/);

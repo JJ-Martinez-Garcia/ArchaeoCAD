@@ -13,9 +13,15 @@ export async function generateMetadata(): Promise<Metadata> {
     description: "Abre, revisa, mide y separa las capas de planos DXF y SVG desde el móvil. El procesamiento se realiza en tu dispositivo.",
     applicationName: "ArqueoCAD Mobile",
     manifest: "/manifest.webmanifest",
+    appleWebApp: {
+      capable: true,
+      statusBarStyle: "black-translucent",
+      title: "ArqueoCAD",
+    },
     icons: {
       icon: "/favicon.svg",
       shortcut: "/favicon.svg",
+      apple: [{ url: "/apple-touch-icon.png", sizes: "192x192", type: "image/png" }],
     },
     openGraph: {
       type: "website",
@@ -44,6 +50,13 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="es">
+      <head>
+        <meta name="mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+        <meta name="apple-mobile-web-app-title" content="ArqueoCAD" />
+        <link rel="apple-touch-icon" sizes="192x192" href="/apple-touch-icon.png" />
+      </head>
       <body>{children}</body>
     </html>
   );

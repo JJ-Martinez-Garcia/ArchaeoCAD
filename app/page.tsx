@@ -23,7 +23,7 @@ import {
 } from "./cad-core";
 import { RasterOptions, vectorizeRaster } from "./raster-vectorizer";
 
-const APP_VERSION = "v7";
+const APP_VERSION = "v8";
 
 type Lang = "es" | "en" | "ar";
 type InstallPromptEvent = Event & {
@@ -128,8 +128,8 @@ const copy = {
     install: "Instalar",
     installTitle: "Instala ArqueoCAD",
     installBody: "Úsala como una app independiente, con acceso desde la pantalla de inicio y funcionamiento sin conexión para los archivos ya cargados.",
-    installIos: "En iPhone o iPad, pulsa Compartir y después «Añadir a pantalla de inicio».",
-    installManual: "Abre el menú del navegador y elige «Instalar aplicación» o «Añadir a pantalla de inicio».",
+    installIos: "Abre esta página en Safari —no dentro de ChatGPT—, pulsa Compartir y después «Añadir a pantalla de inicio».",
+    installManual: "Abre esta página en Chrome —no dentro de ChatGPT— y elige «Instalar aplicación» en el menú del navegador.",
     installNow: "Instalar ahora",
     installLater: "Ahora no",
     understood: "Entendido",
@@ -231,8 +231,8 @@ const copy = {
     install: "Install",
     installTitle: "Install ArqueoCAD",
     installBody: "Use it as a standalone app, open it from your home screen and keep access to previously loaded files while offline.",
-    installIos: "On iPhone or iPad, tap Share and then “Add to Home Screen”.",
-    installManual: "Open the browser menu and choose “Install app” or “Add to Home Screen”.",
+    installIos: "Open this page in Safari—not inside ChatGPT—then tap Share and “Add to Home Screen”.",
+    installManual: "Open this page in Chrome—not inside ChatGPT—and choose “Install app” from the browser menu.",
     installNow: "Install now",
     installLater: "Not now",
     understood: "Got it",
@@ -334,8 +334,8 @@ const copy = {
     install: "تثبيت",
     installTitle: "ثبّت ArqueoCAD",
     installBody: "استخدمه كتطبيق مستقل وافتحه من الشاشة الرئيسية، مع إمكانية الوصول دون اتصال إلى الملفات التي سبق تحميلها.",
-    installIos: "على iPhone أو iPad، اضغط على مشاركة ثم «إضافة إلى الشاشة الرئيسية».",
-    installManual: "افتح قائمة المتصفح واختر «تثبيت التطبيق» أو «إضافة إلى الشاشة الرئيسية».",
+    installIos: "افتح هذه الصفحة في Safari، وليس داخل ChatGPT، ثم اضغط على مشاركة و«إضافة إلى الشاشة الرئيسية».",
+    installManual: "افتح هذه الصفحة في Chrome، وليس داخل ChatGPT، ثم اختر «تثبيت التطبيق» من قائمة المتصفح.",
     installNow: "تثبيت الآن",
     installLater: "ليس الآن",
     understood: "حسناً",
