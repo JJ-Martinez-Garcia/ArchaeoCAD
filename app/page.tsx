@@ -23,9 +23,13 @@ import {
 } from "./cad-core";
 import { RasterOptions, vectorizeRaster } from "./raster-vectorizer";
 
-const APP_VERSION = "v6";
+const APP_VERSION = "v7";
 
 type Lang = "es" | "en" | "ar";
+type InstallPromptEvent = Event & {
+  prompt: () => Promise<void>;
+  userChoice: Promise<{ outcome: "accepted" | "dismissed" }>;
+};
 
 const copy = {
   es: {
@@ -121,6 +125,14 @@ const copy = {
     noLines: "No se han detectado líneas. Prueba a subir el umbral.",
     rasterFeature: "Adelgazado de trazo",
     rasterFeatureBody: "Busca el eje central para evitar las dobles líneas típicas de la vectorización por contornos.",
+    install: "Instalar",
+    installTitle: "Instala ArqueoCAD",
+    installBody: "Úsala como una app independiente, con acceso desde la pantalla de inicio y funcionamiento sin conexión para los archivos ya cargados.",
+    installIos: "En iPhone o iPad, pulsa Compartir y después «Añadir a pantalla de inicio».",
+    installManual: "Abre el menú del navegador y elige «Instalar aplicación» o «Añadir a pantalla de inicio».",
+    installNow: "Instalar ahora",
+    installLater: "Ahora no",
+    understood: "Entendido",
     footerText: "Este es un software gratuito y de libre distribución creado por José Javier Martínez.",
   },
   en: {
@@ -216,6 +228,14 @@ const copy = {
     noLines: "No lines were detected. Try raising the threshold.",
     rasterFeature: "Centre-line thinning",
     rasterFeatureBody: "Finds the centre of each stroke to avoid the double lines produced by contour tracing.",
+    install: "Install",
+    installTitle: "Install ArqueoCAD",
+    installBody: "Use it as a standalone app, open it from your home screen and keep access to previously loaded files while offline.",
+    installIos: "On iPhone or iPad, tap Share and then “Add to Home Screen”.",
+    installManual: "Open the browser menu and choose “Install app” or “Add to Home Screen”.",
+    installNow: "Install now",
+    installLater: "Not now",
+    understood: "Got it",
     footerText: "This is free, freely distributable software created by José Javier Martínez.",
   },
   ar: {
@@ -311,6 +331,14 @@ const copy = {
     noLines: "لم يتم اكتشاف خطوط. جرّب رفع قيمة العتبة.",
     rasterFeature: "ترقيق الخط المركزي",
     rasterFeatureBody: "يحدد مركز كل خط لتجنب الخطوط المزدوجة الناتجة عن تتبع الحدود.",
+    install: "تثبيت",
+    installTitle: "ثبّت ArqueoCAD",
+    installBody: "استخدمه كتطبيق مستقل وافتحه من الشاشة الرئيسية، مع إمكانية الوصول دون اتصال إلى الملفات التي سبق تحميلها.",
+    installIos: "على iPhone أو iPad، اضغط على مشاركة ثم «إضافة إلى الشاشة الرئيسية».",
+    installManual: "افتح قائمة المتصفح واختر «تثبيت التطبيق» أو «إضافة إلى الشاشة الرئيسية».",
+    installNow: "تثبيت الآن",
+    installLater: "ليس الآن",
+    understood: "حسناً",
     footerText: "هذا برنامج مجاني وحرّ التوزيع أنشأه خوسيه خافيير مارتينيث.",
   },
 } as const;
@@ -367,6 +395,10 @@ export default function ArqueoCadMobile() {
   const [realWidth, setRealWidth] = useState("");
   const [rasterUnit, setRasterUnit] = useState<RasterOptions["unit"]>("m");
   const [vectorizing, setVectorizing] = useState(false);
+  const [installPrompt, setInstallPrompt] = useState<InstallPromptEvent | null>(null);
+  const [installMode, setInstallMode] = useState<"native" | "ios" | "manual">("manual");
+  const [installOpen, setInstallOpen] = useState(false);
+  const [installed, setInstalled] = useState(false);
   const planInputRef = useRef<HTMLInputElement>(null);
   const rasterInputRef = useRef<HTMLInputElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
@@ -375,6 +407,42 @@ export default function ArqueoCadMobile() {
 
   useEffect(() => {
     if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => undefined);
+  }, []);
+
+  useEffect(() => {
+    const standalone = window.matchMedia("(display-mode: standalone)").matches || Boolean((navigator as Navigator & { standalone?: boolean }).standalone);
+    if (standalone) {
+      setInstalled(true);
+      return;
+    }
+    const isIos = /iphone|ipad|ipod/i.test(navigator.userAgent);
+    const dismissed = window.sessionStorage.getItem("arqueocad-install-dismissed") === "1";
+    let timer: number | undefined;
+    const offerInstall = (mode: "native" | "ios" | "manual") => {
+      setInstallMode(mode);
+      if (!dismissed) {
+        window.clearTimeout(timer);
+        timer = window.setTimeout(() => setInstallOpen(true), 900);
+      }
+    };
+    const beforeInstall = (event: Event) => {
+      event.preventDefault();
+      setInstallPrompt(event as InstallPromptEvent);
+      offerInstall("native");
+    };
+    const appInstalled = () => {
+      setInstalled(true);
+      setInstallOpen(false);
+      setInstallPrompt(null);
+    };
+    window.addEventListener("beforeinstallprompt", beforeInstall);
+    window.addEventListener("appinstalled", appInstalled);
+    offerInstall(isIos ? "ios" : "manual");
+    return () => {
+      window.clearTimeout(timer);
+      window.removeEventListener("beforeinstallprompt", beforeInstall);
+      window.removeEventListener("appinstalled", appInstalled);
+    };
   }, []);
 
   useEffect(() => {
@@ -407,6 +475,23 @@ export default function ArqueoCadMobile() {
   function resetView() {
     setZoom(1);
     setPan({ x: 0, y: 0 });
+  }
+
+  function dismissInstall() {
+    window.sessionStorage.setItem("arqueocad-install-dismissed", "1");
+    setInstallOpen(false);
+  }
+
+  async function installApp() {
+    if (!installPrompt) {
+      dismissInstall();
+      return;
+    }
+    await installPrompt.prompt();
+    const choice = await installPrompt.userChoice;
+    setInstallPrompt(null);
+    setInstallOpen(false);
+    if (choice.outcome === "dismissed") window.sessionStorage.setItem("arqueocad-install-dismissed", "1");
   }
 
   function loadDrawing(next: Drawing) {
@@ -586,6 +671,7 @@ export default function ArqueoCadMobile() {
         </div>
         <div className="top-actions">
           <span className="privacy-note"><span className="status-dot" />{t.local}</span>
+          {!installed && <button className="install-trigger" onClick={() => setInstallOpen(true)} aria-label={t.install}><span aria-hidden="true">⇩</span><b>{t.install}</b></button>}
           <div className="language-switch" role="group" aria-label={t.chooseLanguage}><button className={lang === "es" ? "active" : ""} onClick={() => setLang("es")} aria-pressed={lang === "es"}>ES</button><button className={lang === "en" ? "active" : ""} onClick={() => setLang("en")} aria-pressed={lang === "en"}>EN</button><button className={lang === "ar" ? "active" : ""} onClick={() => setLang("ar")} aria-pressed={lang === "ar"}>AR</button></div>
           <button className="primary-button compact" onClick={() => planInputRef.current?.click()}><span aria-hidden="true">＋</span>{t.open}</button>
         </div>
@@ -637,6 +723,8 @@ export default function ArqueoCadMobile() {
       <nav className="mobile-nav" aria-label={t.mobileTools}><button onClick={() => planInputRef.current?.click()}><span>＋</span>{t.openShort}</button><button onClick={() => rasterInputRef.current?.click()}><span>▧</span>{t.vectorizeShort}</button><button disabled={!drawing} className={activePanel === "layers" ? "active" : ""} onClick={() => setActivePanel(activePanel === "layers" ? null : "layers")}><span>▤</span>{t.layers}</button><button disabled={!drawing} className={measureMode ? "measure-fab active" : "measure-fab"} onClick={() => { setMeasureMode((value) => !value); setActivePanel(null); }}><span>⌁</span>{t.measure}</button><button disabled={!drawing} onClick={() => setActivePanel(activePanel === "warnings" ? null : "warnings")}><span>!</span>{t.warnings}</button><button disabled={!drawing} onClick={() => setExportOpen(true)}><span>⇩</span>{t.export}</button></nav>
 
       {drawing && measureMode && measurePoints.length > 0 && <section className="measurement-card"><div><span>{t.length}</span><strong>{metrics.length.toFixed(2)} {drawing.unit === "metros" ? "m" : "u"}</strong></div>{measurePoints.length > 2 && <><div><span>{t.area}</span><strong>{metrics.area.toFixed(2)} {drawing.unit === "metros" ? "m²" : "u²"}</strong></div><div><span>{t.perimeter}</span><strong>{metrics.perimeter.toFixed(2)} {drawing.unit === "metros" ? "m" : "u"}</strong></div></>}{measurePoints.length > 1 && <div><span>{t.azimuth}</span><strong>{metrics.azimuth.toFixed(1)}°</strong></div>}<button onClick={() => setMeasurePoints((points) => points.slice(0, -1))}>{t.undo}</button><button onClick={() => setMeasurePoints([])}>{t.clear}</button></section>}
+
+      {installOpen && !installed && <div className="modal-backdrop install-backdrop"><section className="install-card" role="dialog" aria-modal="true" aria-labelledby="install-title"><button className="install-close" onClick={dismissInstall} aria-label={t.close}>×</button><div className="install-app-icon" aria-hidden="true"><span>A</span></div><span className="eyebrow">ARQUEOCAD MOBILE · {APP_VERSION}</span><h2 id="install-title">{t.installTitle}</h2><p>{t.installBody}</p>{installMode !== "native" && <div className="install-instruction"><span>{installMode === "ios" ? "□↑" : "⋮"}</span><strong>{installMode === "ios" ? t.installIos : t.installManual}</strong></div>}<div className="install-actions"><button className="secondary-button" onClick={dismissInstall}>{t.installLater}</button><button className="primary-button" onClick={() => void installApp()}>{installMode === "native" ? t.installNow : t.understood}</button></div></section></div>}
 
       {exportOpen && drawing && <div className="modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) setExportOpen(false); }}><section className="export-modal" role="dialog" aria-modal="true" aria-labelledby="export-title"><div className="modal-heading"><div><span className="eyebrow">{drawing.name}</span><h2 id="export-title">{t.exportTitle}</h2></div><button onClick={() => setExportOpen(false)} aria-label={t.close}>×</button></div><div className="export-summary"><span className="file-stack">▧</span><div><strong>{selectedCount} {t.layers.toLowerCase()}</strong><small>{drawing.primitives.filter((entity) => drawing.layers.find((layer) => layer.name === entity.layer)?.selected).length} {t.prepared}</small></div></div><fieldset><legend>{t.organisation}</legend><label className={exportMode === "layers" ? "choice selected" : "choice"}><input type="radio" name="mode" checked={exportMode === "layers"} onChange={() => setExportMode("layers")} /><span className="radio-dot" /><div><strong>{t.perLayer}</strong><small>{selectedCount} × {Number(exportFormats.dxf) + Number(exportFormats.svg)} {t.files}</small></div></label><label className={exportMode === "filtered" ? "choice selected" : "choice"}><input type="radio" name="mode" checked={exportMode === "filtered"} onChange={() => setExportMode("filtered")} /><span className="radio-dot" /><div><strong>{t.filtered}</strong><small>{t.keepTogether}</small></div></label></fieldset><fieldset><legend>{t.outputs}</legend><div className="format-grid"><label className={exportFormats.dxf ? "format-choice selected" : "format-choice"}><input type="checkbox" checked={exportFormats.dxf} onChange={() => setExportFormats((value) => ({ ...value, dxf: !value.dxf }))} /><span>DXF</span><small>{t.editable}</small></label><label className={exportFormats.svg ? "format-choice selected" : "format-choice"}><input type="checkbox" checked={exportFormats.svg} onChange={() => setExportFormats((value) => ({ ...value, svg: !value.svg }))} /><span>SVG</span><small>{t.inkscape}</small></label></div></fieldset><label className="option-line"><input type="checkbox" defaultChecked /><span className="custom-check">✓</span>{t.blocks}</label><label className="option-line"><input type="checkbox" /><span className="custom-check">✓</span>{t.auxiliary}</label><div className="modal-actions"><button className="secondary-button" onClick={() => setExportOpen(false)}>{t.cancel}</button><button className="primary-button" onClick={createExport} disabled={!selectedCount || (!exportFormats.dxf && !exportFormats.svg)}><span>⇩</span>{t.download}</button></div></section></div>}
 

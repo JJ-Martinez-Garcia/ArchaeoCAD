@@ -279,6 +279,25 @@ button {
   background: var(--ochre);
 }
 
+.install-trigger {
+  height: 34px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 10px;
+  color: var(--ochre-bright);
+  background: rgba(224, 173, 82, 0.08);
+  border: 1px solid #5d4c2d;
+  cursor: pointer;
+  font-size: 9px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.install-trigger span {
+  font-size: 14px;
+}
+
 .primary-button,
 .secondary-button {
   min-height: 42px;
@@ -1130,6 +1149,94 @@ input:checked + .custom-check {
   animation: rise-in 220ms ease-out;
 }
 
+.install-card {
+  width: min(430px, 100%);
+  position: relative;
+  overflow: hidden;
+  padding: 30px;
+  color: #3f413e;
+  background: var(--paper);
+  border-top: 4px solid var(--ochre);
+  box-shadow: var(--shadow);
+  text-align: center;
+  animation: rise-in 220ms ease-out;
+}
+
+.install-close {
+  width: 34px;
+  height: 34px;
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  color: #7e7b72;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  font-size: 24px;
+}
+
+[dir="rtl"] .install-close {
+  right: auto;
+  left: 10px;
+}
+
+.install-app-icon {
+  width: 74px;
+  height: 74px;
+  display: grid;
+  place-items: center;
+  margin: 0 auto 18px;
+  color: #171714;
+  background: var(--ochre);
+  border: 1px solid #6c552b;
+  box-shadow: 10px 10px 0 #1e2a2b;
+  font: 800 40px Georgia, serif;
+}
+
+.install-card h2 {
+  margin: 7px 0 10px;
+  color: #30322f;
+  font: 30px Georgia, serif;
+}
+
+.install-card > p {
+  max-width: 350px;
+  margin: 0 auto 20px;
+  color: #77756d;
+  font-size: 11px;
+  line-height: 1.65;
+}
+
+.install-instruction {
+  display: grid;
+  grid-template-columns: 34px 1fr;
+  align-items: center;
+  gap: 10px;
+  margin: 18px 0;
+  padding: 13px;
+  color: #5e5545;
+  background: #eee4d1;
+  border: 1px solid #dfc99d;
+  text-align: start;
+}
+
+.install-instruction span {
+  color: #8a6423;
+  font-size: 21px;
+  text-align: center;
+}
+
+.install-instruction strong {
+  font-size: 10px;
+  line-height: 1.5;
+}
+
+.install-actions {
+  display: grid;
+  grid-template-columns: 1fr 1.2fr;
+  gap: 8px;
+}
+
 .raster-intro {
   max-width: 670px;
   margin: 15px 0 18px;
@@ -1677,6 +1784,16 @@ input:checked + .custom-check {
     display: none;
   }
 
+  .install-trigger {
+    width: 34px;
+    padding: 0;
+    justify-content: center;
+  }
+
+  .install-trigger b {
+    display: none;
+  }
+
   .workspace {
     height: calc(100dvh - 64px - 64px - 36px);
     min-height: 356px;
@@ -1931,6 +2048,11 @@ input:checked + .custom-check {
     max-height: 93dvh;
     padding: 20px 18px calc(20px + env(safe-area-inset-bottom));
     border-top: 3px solid var(--ochre);
+  }
+
+  .install-card {
+    width: 100%;
+    padding: 28px 20px calc(22px + env(safe-area-inset-bottom));
   }
 
   .raster-layout {
