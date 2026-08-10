@@ -23,7 +23,7 @@ import {
 } from "./cad-core";
 import { RasterOptions, vectorizeRaster } from "./raster-vectorizer";
 
-const APP_VERSION = "v8";
+const APP_VERSION = "v9";
 
 type Lang = "es" | "en" | "ar";
 type InstallPromptEvent = Event & {
@@ -133,6 +133,23 @@ const copy = {
     installNow: "Instalar ahora",
     installLater: "Ahora no",
     understood: "Entendido",
+    help: "Ayuda",
+    helpTitle: "Manual de ArqueoCAD Mobile",
+    helpIntro: "Una guía rápida para abrir, revisar, medir y convertir tus planos arqueológicos desde el móvil.",
+    helpOpenTitle: "1 · Abrir un plano",
+    helpOpenBody: "Pulsa Abrir en la barra lateral y selecciona un archivo DXF, DWG o SVG. El plano se procesa en este dispositivo; no se sube a ningún servidor.",
+    helpRasterTitle: "2 · Vectorizar una imagen",
+    helpRasterBody: "Pulsa Imagen para cargar PNG, JPG, WEBP o BMP. Ajusta el umbral y el detalle, mantén la clasificación automática y usa la barra gráfica para calibrar el dibujo.",
+    helpLayersTitle: "3 · Revisar capas",
+    helpLayersBody: "En Capas puedes ocultar elementos con el ojo, decidir qué se exporta con la casilla y buscar una capa por nombre. Las capas se clasifican automáticamente por geometría.",
+    helpMeasureTitle: "4 · Medir",
+    helpMeasureBody: "Activa Medir y toca varios puntos sobre el plano. Verás longitud, perímetro, área y acimut. Usa Deshacer o Limpiar para empezar de nuevo.",
+    helpExportTitle: "5 · Exportar",
+    helpExportBody: "En Exportar elige un archivo por capa o un plano con la selección. Puedes crear un ZIP con DXF editable y SVG para Inkscape o la web.",
+    helpInstallTitle: "6 · Instalar como app",
+    helpInstallBody: "En Android usa Chrome → Instalar aplicación. En iPhone abre la página en Safari → Compartir → Añadir a pantalla de inicio. No la instales desde el navegador interno de ChatGPT.",
+    helpTipsTitle: "Consejos de calidad",
+    helpTipsBody: "La vectorización es semiautomática: revisa trazos, textos y capas antes de usar el resultado como documentación definitiva. Para conservar bloques y estructuras CAD originales, trabaja con el DXF de origen.",
     footerText: "Este es un software gratuito y de libre distribución creado por José Javier Martínez.",
   },
   en: {
@@ -236,6 +253,23 @@ const copy = {
     installNow: "Install now",
     installLater: "Not now",
     understood: "Got it",
+    help: "Help",
+    helpTitle: "ArqueoCAD Mobile guide",
+    helpIntro: "A quick guide to opening, reviewing, measuring and converting archaeological drawings on your phone.",
+    helpOpenTitle: "1 · Open a drawing",
+    helpOpenBody: "Tap Open in the side rail and select a DXF, DWG or SVG file. The drawing is processed on this device and is never uploaded to a server.",
+    helpRasterTitle: "2 · Vectorize an image",
+    helpRasterBody: "Tap Image to load PNG, JPG, WEBP or BMP. Adjust threshold and detail, keep automatic classification enabled and use the graphic scale to calibrate the drawing.",
+    helpLayersTitle: "3 · Review layers",
+    helpLayersBody: "In Layers, hide elements with the eye, choose what is exported with the checkbox and search by layer name. Layers are classified automatically from their geometry.",
+    helpMeasureTitle: "4 · Measure",
+    helpMeasureBody: "Turn on Measure and tap several points on the drawing. You will see length, perimeter, area and azimuth. Use Undo or Clear to start again.",
+    helpExportTitle: "5 · Export",
+    helpExportBody: "In Export, choose one file per layer or a drawing with the current selection. You can create a ZIP containing editable DXF and SVG for Inkscape or the web.",
+    helpInstallTitle: "6 · Install as an app",
+    helpInstallBody: "On Android use Chrome → Install app. On iPhone open the page in Safari → Share → Add to Home Screen. Do not install it from ChatGPT's in-app browser.",
+    helpTipsTitle: "Quality tips",
+    helpTipsBody: "Vectorization is semi-automatic: review strokes, text and layers before using the result as final documentation. To preserve original CAD blocks and structures, work from the source DXF.",
     footerText: "This is free, freely distributable software created by José Javier Martínez.",
   },
   ar: {
@@ -339,6 +373,23 @@ const copy = {
     installNow: "تثبيت الآن",
     installLater: "ليس الآن",
     understood: "حسناً",
+    help: "المساعدة",
+    helpTitle: "دليل ArqueoCAD Mobile",
+    helpIntro: "دليل سريع لفتح المخططات الأثرية ومراجعتها وقياسها وتحويلها من الهاتف.",
+    helpOpenTitle: "١ · فتح مخطط",
+    helpOpenBody: "اضغط على فتح في الشريط الجانبي واختر ملف DXF أو DWG أو SVG. تتم معالجة المخطط على هذا الجهاز ولا يتم رفعه إلى أي خادم.",
+    helpRasterTitle: "٢ · تحويل صورة إلى متجهات",
+    helpRasterBody: "اضغط على صورة لتحميل PNG أو JPG أو WEBP أو BMP. اضبط العتبة والتفاصيل، واترك التصنيف التلقائي مفعلاً، واستخدم شريط المقياس لمعايرة المخطط.",
+    helpLayersTitle: "٣ · مراجعة الطبقات",
+    helpLayersBody: "في الطبقات يمكنك إخفاء العناصر برمز العين، وتحديد ما يتم تصديره بمربع الاختيار، والبحث باسم الطبقة. تُصنف الطبقات تلقائياً من هندستها.",
+    helpMeasureTitle: "٤ · القياس",
+    helpMeasureBody: "فعّل القياس واضغط على عدة نقاط في المخطط. ستظهر لك المسافة والمحيط والمساحة والسمت. استخدم تراجع أو مسح للبدء من جديد.",
+    helpExportTitle: "٥ · التصدير",
+    helpExportBody: "في التصدير اختر ملفاً لكل طبقة أو مخططاً بالعناصر المحددة. يمكنك إنشاء ZIP يحتوي على DXF قابل للتحرير وSVG لـ Inkscape أو الويب.",
+    helpInstallTitle: "٦ · التثبيت كتطبيق",
+    helpInstallBody: "على Android استخدم Chrome ← تثبيت التطبيق. على iPhone افتح الصفحة في Safari ← مشاركة ← إضافة إلى الشاشة الرئيسية. لا تثبته من متصفح ChatGPT الداخلي.",
+    helpTipsTitle: "نصائح للجودة",
+    helpTipsBody: "تحويل الصور إلى متجهات شبه تلقائي: راجع الخطوط والنصوص والطبقات قبل استخدام النتيجة كتوثيق نهائي. للحفاظ على كتل وبنية CAD الأصلية استخدم ملف DXF المصدر.",
     footerText: "هذا برنامج مجاني وحرّ التوزيع أنشأه خوسيه خافيير مارتينيث.",
   },
 } as const;
@@ -399,6 +450,7 @@ export default function ArqueoCadMobile() {
   const [installMode, setInstallMode] = useState<"native" | "ios" | "manual">("manual");
   const [installOpen, setInstallOpen] = useState(false);
   const [installed, setInstalled] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
   const planInputRef = useRef<HTMLInputElement>(null);
   const rasterInputRef = useRef<HTMLInputElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
@@ -673,7 +725,7 @@ export default function ArqueoCadMobile() {
           <span className="privacy-note"><span className="status-dot" />{t.local}</span>
           {!installed && <button className="install-trigger" onClick={() => setInstallOpen(true)} aria-label={t.install}><span aria-hidden="true">⇩</span><b>{t.install}</b></button>}
           <div className="language-switch" role="group" aria-label={t.chooseLanguage}><button className={lang === "es" ? "active" : ""} onClick={() => setLang("es")} aria-pressed={lang === "es"}>ES</button><button className={lang === "en" ? "active" : ""} onClick={() => setLang("en")} aria-pressed={lang === "en"}>EN</button><button className={lang === "ar" ? "active" : ""} onClick={() => setLang("ar")} aria-pressed={lang === "ar"}>AR</button></div>
-          <button className="primary-button compact" onClick={() => planInputRef.current?.click()}><span aria-hidden="true">＋</span>{t.open}</button>
+          <button className="help-trigger" onClick={() => setHelpOpen(true)} aria-label={t.help} title={t.help}>?</button>
         </div>
       </header>
 
@@ -725,6 +777,8 @@ export default function ArqueoCadMobile() {
       {drawing && measureMode && measurePoints.length > 0 && <section className="measurement-card"><div><span>{t.length}</span><strong>{metrics.length.toFixed(2)} {drawing.unit === "metros" ? "m" : "u"}</strong></div>{measurePoints.length > 2 && <><div><span>{t.area}</span><strong>{metrics.area.toFixed(2)} {drawing.unit === "metros" ? "m²" : "u²"}</strong></div><div><span>{t.perimeter}</span><strong>{metrics.perimeter.toFixed(2)} {drawing.unit === "metros" ? "m" : "u"}</strong></div></>}{measurePoints.length > 1 && <div><span>{t.azimuth}</span><strong>{metrics.azimuth.toFixed(1)}°</strong></div>}<button onClick={() => setMeasurePoints((points) => points.slice(0, -1))}>{t.undo}</button><button onClick={() => setMeasurePoints([])}>{t.clear}</button></section>}
 
       {installOpen && !installed && <div className="modal-backdrop install-backdrop"><section className="install-card" role="dialog" aria-modal="true" aria-labelledby="install-title"><button className="install-close" onClick={dismissInstall} aria-label={t.close}>×</button><div className="install-app-icon" aria-hidden="true"><span>A</span></div><span className="eyebrow">ARQUEOCAD MOBILE · {APP_VERSION}</span><h2 id="install-title">{t.installTitle}</h2><p>{t.installBody}</p>{installMode !== "native" && <div className="install-instruction"><span>{installMode === "ios" ? "□↑" : "⋮"}</span><strong>{installMode === "ios" ? t.installIos : t.installManual}</strong></div>}<div className="install-actions"><button className="secondary-button" onClick={dismissInstall}>{t.installLater}</button><button className="primary-button" onClick={() => void installApp()}>{installMode === "native" ? t.installNow : t.understood}</button></div></section></div>}
+
+      {helpOpen && <div className="modal-backdrop help-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) setHelpOpen(false); }}><section className="help-modal" role="dialog" aria-modal="true" aria-labelledby="help-title"><div className="modal-heading"><div><span className="eyebrow">ARQUEOCAD MOBILE · {APP_VERSION}</span><h2 id="help-title">{t.helpTitle}</h2></div><button onClick={() => setHelpOpen(false)} aria-label={t.close}>×</button></div><p className="help-intro">{t.helpIntro}</p><div className="help-grid"><article><span>01</span><div><h3>{t.helpOpenTitle}</h3><p>{t.helpOpenBody}</p></div></article><article><span>02</span><div><h3>{t.helpRasterTitle}</h3><p>{t.helpRasterBody}</p></div></article><article><span>03</span><div><h3>{t.helpLayersTitle}</h3><p>{t.helpLayersBody}</p></div></article><article><span>04</span><div><h3>{t.helpMeasureTitle}</h3><p>{t.helpMeasureBody}</p></div></article><article><span>05</span><div><h3>{t.helpExportTitle}</h3><p>{t.helpExportBody}</p></div></article><article><span>06</span><div><h3>{t.helpInstallTitle}</h3><p>{t.helpInstallBody}</p></div></article></div><div className="help-tip"><strong>{t.helpTipsTitle}</strong><p>{t.helpTipsBody}</p></div><div className="modal-actions"><button className="primary-button" onClick={() => setHelpOpen(false)}>{t.close}</button></div></section></div>}
 
       {exportOpen && drawing && <div className="modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) setExportOpen(false); }}><section className="export-modal" role="dialog" aria-modal="true" aria-labelledby="export-title"><div className="modal-heading"><div><span className="eyebrow">{drawing.name}</span><h2 id="export-title">{t.exportTitle}</h2></div><button onClick={() => setExportOpen(false)} aria-label={t.close}>×</button></div><div className="export-summary"><span className="file-stack">▧</span><div><strong>{selectedCount} {t.layers.toLowerCase()}</strong><small>{drawing.primitives.filter((entity) => drawing.layers.find((layer) => layer.name === entity.layer)?.selected).length} {t.prepared}</small></div></div><fieldset><legend>{t.organisation}</legend><label className={exportMode === "layers" ? "choice selected" : "choice"}><input type="radio" name="mode" checked={exportMode === "layers"} onChange={() => setExportMode("layers")} /><span className="radio-dot" /><div><strong>{t.perLayer}</strong><small>{selectedCount} × {Number(exportFormats.dxf) + Number(exportFormats.svg)} {t.files}</small></div></label><label className={exportMode === "filtered" ? "choice selected" : "choice"}><input type="radio" name="mode" checked={exportMode === "filtered"} onChange={() => setExportMode("filtered")} /><span className="radio-dot" /><div><strong>{t.filtered}</strong><small>{t.keepTogether}</small></div></label></fieldset><fieldset><legend>{t.outputs}</legend><div className="format-grid"><label className={exportFormats.dxf ? "format-choice selected" : "format-choice"}><input type="checkbox" checked={exportFormats.dxf} onChange={() => setExportFormats((value) => ({ ...value, dxf: !value.dxf }))} /><span>DXF</span><small>{t.editable}</small></label><label className={exportFormats.svg ? "format-choice selected" : "format-choice"}><input type="checkbox" checked={exportFormats.svg} onChange={() => setExportFormats((value) => ({ ...value, svg: !value.svg }))} /><span>SVG</span><small>{t.inkscape}</small></label></div></fieldset><label className="option-line"><input type="checkbox" defaultChecked /><span className="custom-check">✓</span>{t.blocks}</label><label className="option-line"><input type="checkbox" /><span className="custom-check">✓</span>{t.auxiliary}</label><div className="modal-actions"><button className="secondary-button" onClick={() => setExportOpen(false)}>{t.cancel}</button><button className="primary-button" onClick={createExport} disabled={!selectedCount || (!exportFormats.dxf && !exportFormats.svg)}><span>⇩</span>{t.download}</button></div></section></div>}
 
