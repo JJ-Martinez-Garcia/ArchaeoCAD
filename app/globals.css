@@ -279,6 +279,38 @@ button {
   background: var(--ochre);
 }
 
+.language-select-wrap {
+  height: 34px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 7px 0 9px;
+  color: #7f8987;
+  border: 1px solid #344043;
+  background: #111719;
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.language-select {
+  min-width: 132px;
+  height: 30px;
+  color: #e1e2dc;
+  background: #111719;
+  border: 0;
+  outline: 0;
+  cursor: pointer;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.language-select option {
+  color: #e1e2dc;
+  background: #111719;
+}
+
 .install-trigger {
   height: 34px;
   display: inline-flex;
@@ -385,6 +417,21 @@ button {
 }
 
 .license-footer a:hover {
+  color: var(--ochre-bright);
+  text-decoration: underline;
+}
+
+.license-footer .about-link {
+  padding: 0;
+  color: #cba152;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 700;
+}
+
+.license-footer .about-link:hover {
   color: var(--ochre-bright);
   text-decoration: underline;
 }
@@ -1167,6 +1214,29 @@ input:checked + .custom-check {
   animation: rise-in 220ms ease-out;
 }
 
+.about-modal {
+  width: min(560px, 100%);
+  padding: 25px;
+  color: #3f413e;
+  background: var(--paper);
+  box-shadow: var(--shadow);
+  animation: rise-in 220ms ease-out;
+}
+
+.about-body {
+  margin: 22px 0 10px;
+  color: #4d514d;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 17px;
+  line-height: 1.65;
+}
+
+.about-body a {
+  color: #966d20;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
 .install-card {
   width: min(430px, 100%);
   position: relative;
@@ -1881,6 +1951,20 @@ input:checked + .custom-check {
     width: 34px;
     padding: 0;
     justify-content: center;
+  }
+
+  .language-select-wrap {
+    gap: 0;
+    padding-inline: 4px;
+  }
+
+  .language-select-wrap > span {
+    display: none;
+  }
+
+  .language-select {
+    min-width: 108px;
+    font-size: 9px;
   }
 
   .install-trigger b {

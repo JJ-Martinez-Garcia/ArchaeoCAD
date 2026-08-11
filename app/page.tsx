@@ -23,9 +23,9 @@ import {
 } from "./cad-core";
 import { RasterOptions, vectorizeRaster } from "./raster-vectorizer";
 
-const APP_VERSION = "v9";
+const APP_VERSION = "v10";
 
-type Lang = "es" | "en" | "ar";
+type Lang = "es" | "en" | "ar" | "fr" | "de" | "it" | "pt" | "zh" | "hi" | "ru" | "ja";
 type InstallPromptEvent = Event & {
   prompt: () => Promise<void>;
   userChoice: Promise<{ outcome: "accepted" | "dismissed" }>;
@@ -151,6 +151,10 @@ const copy = {
     helpTipsTitle: "Consejos de calidad",
     helpTipsBody: "La vectorización es semiautomática: revisa trazos, textos y capas antes de usar el resultado como documentación definitiva. Para conservar bloques y estructuras CAD originales, trabaja con el DXF de origen.",
     footerText: "Este es un software gratuito y de libre distribución creado por José Javier Martínez.",
+    about: "Acerca de",
+    aboutTitle: "Acerca de ArqueoCAD",
+    aboutBodyPrefix: "Esta aplicación forma parte del",
+    aboutBodySuffix: "de José Javier Martínez García",
   },
   en: {
     brandTag: "FIELD DRAWING",
@@ -271,6 +275,10 @@ const copy = {
     helpTipsTitle: "Quality tips",
     helpTipsBody: "Vectorization is semi-automatic: review strokes, text and layers before using the result as final documentation. To preserve original CAD blocks and structures, work from the source DXF.",
     footerText: "This is free, freely distributable software created by José Javier Martínez.",
+    about: "About",
+    aboutTitle: "About ArqueoCAD",
+    aboutBodyPrefix: "This application is part of",
+    aboutBodySuffix: "by José Javier Martínez García",
   },
   ar: {
     brandTag: "الرسم الميداني",
@@ -391,8 +399,45 @@ const copy = {
     helpTipsTitle: "نصائح للجودة",
     helpTipsBody: "تحويل الصور إلى متجهات شبه تلقائي: راجع الخطوط والنصوص والطبقات قبل استخدام النتيجة كتوثيق نهائي. للحفاظ على كتل وبنية CAD الأصلية استخدم ملف DXF المصدر.",
     footerText: "هذا برنامج مجاني وحرّ التوزيع أنشأه خوسيه خافيير مارتينيث.",
+    about: "حول",
+    aboutTitle: "حول ArqueoCAD",
+    aboutBodyPrefix: "هذا التطبيق جزء من",
+    aboutBodySuffix: "لـ خوسيه خافيير مارتينيث غارسيا",
   },
 } as const;
+
+const languageOptions: Array<{ code: Lang; label: string }> = [
+  { code: "es", label: "Español" },
+  { code: "en", label: "English" },
+  { code: "ar", label: "العربية" },
+  { code: "fr", label: "Français" },
+  { code: "de", label: "Deutsch" },
+  { code: "it", label: "Italiano" },
+  { code: "pt", label: "Português" },
+  { code: "zh", label: "中文" },
+  { code: "hi", label: "हिन्दी" },
+  { code: "ru", label: "Русский" },
+  { code: "ja", label: "日本語" },
+];
+
+type Copy = typeof copy.es;
+
+const languageOverrides: Partial<Record<Exclude<Lang, "es" | "en" | "ar">, Partial<Copy>>> = {
+  fr: { brandTag: "DESSIN DE TERRAIN", open: "Ouvrir le plan", openShort: "Ouvrir", vectorize: "Vectoriser l’image", layers: "Calques", measure: "Mesurer", export: "Exporter", warnings: "Alertes", fit: "Ajuster le plan", noDrawing: "Aucun plan ouvert", chooseLanguage: "Langue", drawing: "Plan", content: "CONTENU DU PLAN", quality: "CONTRÔLE QUALITÉ", search: "Rechercher un calque…", all: "Toutes", none: "Aucune", close: "Fermer", cancel: "Annuler", download: "Créer le ZIP", rasterTitle: "Vectoriser une image raster", classify: "Classer les types de lignes", process: "Générer la géométrie", install: "Installer", installTitle: "Installer ArqueoCAD", help: "Aide", helpTitle: "Manuel ArqueoCAD Mobile", footerText: "Logiciel gratuit et librement distribuable créé par José Javier Martínez.", about: "À propos", aboutTitle: "À propos d’ArqueoCAD", aboutBodyPrefix: "Cette application fait partie du", aboutBodySuffix: "de José Javier Martínez García" },
+  de: { brandTag: "FELDZEICHNUNG", open: "Plan öffnen", openShort: "Öffnen", vectorize: "Bild vektorisieren", layers: "Ebenen", measure: "Messen", export: "Exportieren", warnings: "Hinweise", fit: "Plan einpassen", noDrawing: "Kein Plan geöffnet", chooseLanguage: "Sprache", drawing: "Plan", content: "PLANINHALT", quality: "QUALITÄTSKONTROLLE", search: "Ebene suchen…", all: "Alle", none: "Keine", close: "Schließen", cancel: "Abbrechen", download: "ZIP erstellen", rasterTitle: "Rasterbild vektorisieren", classify: "Linientypen klassifizieren", process: "Geometrie erzeugen", install: "Installieren", installTitle: "ArqueoCAD installieren", help: "Hilfe", helpTitle: "ArqueoCAD Mobile-Handbuch", footerText: "Kostenlose, frei verbreitbare Software von José Javier Martínez.", about: "Über", aboutTitle: "Über ArqueoCAD", aboutBodyPrefix: "Diese Anwendung ist Teil des", aboutBodySuffix: "von José Javier Martínez García" },
+  it: { brandTag: "DISEGNO DI CAMPO", open: "Apri pianta", openShort: "Apri", vectorize: "Vettorializza immagine", layers: "Livelli", measure: "Misura", export: "Esporta", warnings: "Avvisi", fit: "Adatta pianta", noDrawing: "Nessuna pianta aperta", chooseLanguage: "Lingua", drawing: "Pianta", content: "CONTENUTO DELLA PIANTA", quality: "CONTROLLO QUALITÀ", search: "Cerca livello…", all: "Tutte", none: "Nessuna", close: "Chiudi", cancel: "Annulla", download: "Crea pacchetto ZIP", rasterTitle: "Vettorializza immagine raster", classify: "Classifica tipi di linea", process: "Genera geometria", install: "Installa", installTitle: "Installa ArqueoCAD", help: "Aiuto", helpTitle: "Manuale ArqueoCAD Mobile", footerText: "Software gratuito e liberamente distribuibile creato da José Javier Martínez.", about: "Informazioni", aboutTitle: "Informazioni su ArqueoCAD", aboutBodyPrefix: "Questa applicazione fa parte del", aboutBodySuffix: "di José Javier Martínez García" },
+  pt: { brandTag: "DESENHO DE CAMPO", open: "Abrir planta", openShort: "Abrir", vectorize: "Vetorializar imagem", layers: "Camadas", measure: "Medir", export: "Exportar", warnings: "Avisos", fit: "Enquadrar planta", noDrawing: "Nenhuma planta aberta", chooseLanguage: "Idioma", drawing: "Planta", content: "CONTEÚDO DA PLANTA", quality: "CONTROLO DE QUALIDADE", search: "Procurar camada…", all: "Todas", none: "Nenhuma", close: "Fechar", cancel: "Cancelar", download: "Criar pacote ZIP", rasterTitle: "Vetorializar imagem raster", classify: "Classificar tipos de linha", process: "Gerar geometria", install: "Instalar", installTitle: "Instale o ArqueoCAD", help: "Ajuda", helpTitle: "Manual do ArqueoCAD Mobile", footerText: "Software gratuito e de livre distribuição criado por José Javier Martínez.", about: "Acerca de", aboutTitle: "Acerca do ArqueoCAD", aboutBodyPrefix: "Esta aplicação faz parte do", aboutBodySuffix: "de José Javier Martínez García" },
+  zh: { brandTag: "现场绘图", open: "打开平面图", openShort: "打开", vectorize: "矢量化图像", layers: "图层", measure: "测量", export: "导出", warnings: "提示", fit: "适应图纸", noDrawing: "未打开图纸", chooseLanguage: "语言", drawing: "图纸", content: "图纸内容", quality: "质量控制", search: "搜索图层…", all: "全部", none: "无", close: "关闭", cancel: "取消", download: "创建 ZIP", rasterTitle: "矢量化栅格图像", classify: "分类线型", process: "生成几何", install: "安装", installTitle: "安装 ArqueoCAD", help: "帮助", helpTitle: "ArqueoCAD Mobile 手册", footerText: "由 José Javier Martínez 创建的免费、自由分发软件。", about: "关于", aboutTitle: "关于 ArqueoCAD", aboutBodyPrefix: "此应用属于", aboutBodySuffix: "的 José Javier Martínez García" },
+  hi: { brandTag: "फील्ड ड्रॉइंग", open: "प्लान खोलें", openShort: "खोलें", vectorize: "चित्र वेक्टराइज़ करें", layers: "लेयर", measure: "मापें", export: "निर्यात", warnings: "सूचनाएँ", fit: "प्लान फिट करें", noDrawing: "कोई प्लान खुला नहीं", chooseLanguage: "भाषा", drawing: "प्लान", content: "प्लान सामग्री", quality: "गुणवत्ता नियंत्रण", search: "लेयर खोजें…", all: "सभी", none: "कोई नहीं", close: "बंद करें", cancel: "रद्द करें", download: "ZIP बनाएँ", rasterTitle: "रास्टर चित्र वेक्टराइज़ करें", classify: "रेखा प्रकार वर्गीकृत करें", process: "ज्यामिति बनाएँ", install: "इंस्टॉल", installTitle: "ArqueoCAD इंस्टॉल करें", help: "सहायता", helpTitle: "ArqueoCAD Mobile मैनुअल", footerText: "José Javier Martínez द्वारा बनाया गया निःशुल्क, मुक्त वितरण सॉफ़्टवेयर।", about: "परिचय", aboutTitle: "ArqueoCAD के बारे में", aboutBodyPrefix: "यह एप्लिकेशन इसका हिस्सा है", aboutBodySuffix: "José Javier Martínez García का" },
+  ru: { brandTag: "ПОЛЕВОЙ ЧЕРТЁЖ", open: "Открыть план", openShort: "Открыть", vectorize: "Векторизовать изображение", layers: "Слои", measure: "Измерить", export: "Экспорт", warnings: "Предупреждения", fit: "Вписать план", noDrawing: "План не открыт", chooseLanguage: "Язык", drawing: "План", content: "СОДЕРЖИМОЕ ПЛАНА", quality: "КОНТРОЛЬ КАЧЕСТВА", search: "Поиск слоя…", all: "Все", none: "Нет", close: "Закрыть", cancel: "Отмена", download: "Создать ZIP", rasterTitle: "Векторизация растра", classify: "Классифицировать типы линий", process: "Создать геометрию", install: "Установить", installTitle: "Установить ArqueoCAD", help: "Помощь", helpTitle: "Руководство ArqueoCAD Mobile", footerText: "Бесплатное свободно распространяемое ПО José Javier Martínez.", about: "О приложении", aboutTitle: "О ArqueoCAD", aboutBodyPrefix: "Это приложение является частью", aboutBodySuffix: "José Javier Martínez García" },
+  ja: { brandTag: "現地図面", open: "図面を開く", openShort: "開く", vectorize: "画像をベクトル化", layers: "レイヤー", measure: "測定", export: "書き出し", warnings: "警告", fit: "図面に合わせる", noDrawing: "図面が開かれていません", chooseLanguage: "言語", drawing: "図面", content: "図面の内容", quality: "品質管理", search: "レイヤーを検索…", all: "すべて", none: "なし", close: "閉じる", cancel: "キャンセル", download: "ZIPを作成", rasterTitle: "ラスター画像をベクトル化", classify: "線種を分類", process: "ジオメトリを生成", install: "インストール", installTitle: "ArqueoCADをインストール", help: "ヘルプ", helpTitle: "ArqueoCAD Mobile マニュアル", footerText: "José Javier Martínez が作成した無料・自由配布ソフトウェア。", about: "概要", aboutTitle: "ArqueoCADについて", aboutBodyPrefix: "このアプリは", aboutBodySuffix: "José Javier Martínez García の一部です" },
+};
+
+function browserLanguage(): Lang {
+  if (typeof navigator === "undefined") return "es";
+  const candidates = [navigator.language, ...(navigator.languages ?? [])].filter(Boolean).map((value) => value.toLowerCase().split("-")[0]);
+  return candidates.find((value): value is Lang => languageOptions.some((option) => option.code === value)) ?? "es";
+}
 
 type RasterJob = { file: File; url: string };
 
@@ -451,11 +496,12 @@ export default function ArqueoCadMobile() {
   const [installOpen, setInstallOpen] = useState(false);
   const [installed, setInstalled] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
+  const [aboutOpen, setAboutOpen] = useState(false);
   const planInputRef = useRef<HTMLInputElement>(null);
   const rasterInputRef = useRef<HTMLInputElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
   const dragRef = useRef<{ x: number; y: number; panX: number; panY: number; moved: boolean } | null>(null);
-  const t = copy[lang];
+  const t: Copy = lang === "es" ? copy.es : lang === "en" ? copy.en : lang === "ar" ? copy.ar : { ...copy.es, ...(languageOverrides[lang] ?? {}) };
 
   useEffect(() => {
     if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => undefined);
@@ -500,7 +546,14 @@ export default function ArqueoCadMobile() {
   useEffect(() => {
     document.documentElement.lang = lang;
     document.documentElement.dir = lang === "ar" ? "rtl" : "ltr";
+    window.localStorage.setItem("arqueocad-language", lang);
   }, [lang]);
+
+  useEffect(() => {
+    const saved = window.localStorage.getItem("arqueocad-language") as Lang | null;
+    if (saved && languageOptions.some((option) => option.code === saved)) setLang(saved);
+    else setLang(browserLanguage());
+  }, []);
 
   useEffect(() => {
     if (!toast) return;
@@ -724,7 +777,7 @@ export default function ArqueoCadMobile() {
         <div className="top-actions">
           <span className="privacy-note"><span className="status-dot" />{t.local}</span>
           {!installed && <button className="install-trigger" onClick={() => setInstallOpen(true)} aria-label={t.install}><span aria-hidden="true">⇩</span><b>{t.install}</b></button>}
-          <div className="language-switch" role="group" aria-label={t.chooseLanguage}><button className={lang === "es" ? "active" : ""} onClick={() => setLang("es")} aria-pressed={lang === "es"}>ES</button><button className={lang === "en" ? "active" : ""} onClick={() => setLang("en")} aria-pressed={lang === "en"}>EN</button><button className={lang === "ar" ? "active" : ""} onClick={() => setLang("ar")} aria-pressed={lang === "ar"}>AR</button></div>
+          <label className="language-select-wrap"><span>{t.chooseLanguage}</span><select className="language-select" value={lang} onChange={(event) => setLang(event.target.value as Lang)} aria-label={t.chooseLanguage}>{languageOptions.map((option) => <option key={option.code} value={option.code}>{option.code.toUpperCase()} — {option.label}</option>)}</select></label>
           <button className="help-trigger" onClick={() => setHelpOpen(true)} aria-label={t.help} title={t.help}>?</button>
         </div>
       </header>
@@ -770,7 +823,7 @@ export default function ArqueoCadMobile() {
         </>}
       </section>
 
-      <footer className="license-footer"><span>{t.footerText}</span><a href="http://www.josejaviermartinez.com" target="_blank" rel="noreferrer">www.josejaviermartinez.com</a></footer>
+      <footer className="license-footer"><span>{t.footerText}</span><a href="http://www.josejaviermartinez.com" target="_blank" rel="noreferrer">www.josejaviermartinez.com</a><a href="https://laboratorio-digital.jjmartinezgarcia.chatgpt.site/" target="_blank" rel="noreferrer">Laboratorio Digital</a><button className="about-link" onClick={() => setAboutOpen(true)}>{t.about}</button></footer>
 
       <nav className="mobile-nav" aria-label={t.mobileTools}><button onClick={() => planInputRef.current?.click()}><span>＋</span>{t.openShort}</button><button onClick={() => rasterInputRef.current?.click()}><span>▧</span>{t.vectorizeShort}</button><button disabled={!drawing} className={activePanel === "layers" ? "active" : ""} onClick={() => setActivePanel(activePanel === "layers" ? null : "layers")}><span>▤</span>{t.layers}</button><button disabled={!drawing} className={measureMode ? "measure-fab active" : "measure-fab"} onClick={() => { setMeasureMode((value) => !value); setActivePanel(null); }}><span>⌁</span>{t.measure}</button><button disabled={!drawing} onClick={() => setActivePanel(activePanel === "warnings" ? null : "warnings")}><span>!</span>{t.warnings}</button><button disabled={!drawing} onClick={() => setExportOpen(true)}><span>⇩</span>{t.export}</button></nav>
 
@@ -779,6 +832,7 @@ export default function ArqueoCadMobile() {
       {installOpen && !installed && <div className="modal-backdrop install-backdrop"><section className="install-card" role="dialog" aria-modal="true" aria-labelledby="install-title"><button className="install-close" onClick={dismissInstall} aria-label={t.close}>×</button><div className="install-app-icon" aria-hidden="true"><span>A</span></div><span className="eyebrow">ARQUEOCAD MOBILE · {APP_VERSION}</span><h2 id="install-title">{t.installTitle}</h2><p>{t.installBody}</p>{installMode !== "native" && <div className="install-instruction"><span>{installMode === "ios" ? "□↑" : "⋮"}</span><strong>{installMode === "ios" ? t.installIos : t.installManual}</strong></div>}<div className="install-actions"><button className="secondary-button" onClick={dismissInstall}>{t.installLater}</button><button className="primary-button" onClick={() => void installApp()}>{installMode === "native" ? t.installNow : t.understood}</button></div></section></div>}
 
       {helpOpen && <div className="modal-backdrop help-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) setHelpOpen(false); }}><section className="help-modal" role="dialog" aria-modal="true" aria-labelledby="help-title"><div className="modal-heading"><div><span className="eyebrow">ARQUEOCAD MOBILE · {APP_VERSION}</span><h2 id="help-title">{t.helpTitle}</h2></div><button onClick={() => setHelpOpen(false)} aria-label={t.close}>×</button></div><p className="help-intro">{t.helpIntro}</p><div className="help-grid"><article><span>01</span><div><h3>{t.helpOpenTitle}</h3><p>{t.helpOpenBody}</p></div></article><article><span>02</span><div><h3>{t.helpRasterTitle}</h3><p>{t.helpRasterBody}</p></div></article><article><span>03</span><div><h3>{t.helpLayersTitle}</h3><p>{t.helpLayersBody}</p></div></article><article><span>04</span><div><h3>{t.helpMeasureTitle}</h3><p>{t.helpMeasureBody}</p></div></article><article><span>05</span><div><h3>{t.helpExportTitle}</h3><p>{t.helpExportBody}</p></div></article><article><span>06</span><div><h3>{t.helpInstallTitle}</h3><p>{t.helpInstallBody}</p></div></article></div><div className="help-tip"><strong>{t.helpTipsTitle}</strong><p>{t.helpTipsBody}</p></div><div className="modal-actions"><button className="primary-button" onClick={() => setHelpOpen(false)}>{t.close}</button></div></section></div>}
+      {aboutOpen && <div className="modal-backdrop about-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) setAboutOpen(false); }}><section className="about-modal" role="dialog" aria-modal="true" aria-labelledby="about-title"><div className="modal-heading"><div><span className="eyebrow">ARQUEOCAD MOBILE · {APP_VERSION}</span><h2 id="about-title">{t.aboutTitle}</h2></div><button onClick={() => setAboutOpen(false)} aria-label={t.close}>×</button></div><p className="about-body">{t.aboutBodyPrefix} <a href="https://laboratorio-digital.jjmartinezgarcia.chatgpt.site/" target="_blank" rel="noreferrer">Laboratorio Digital</a> {t.aboutBodySuffix}</p><div className="modal-actions"><button className="primary-button" onClick={() => setAboutOpen(false)}>{t.close}</button></div></section></div>}
 
       {exportOpen && drawing && <div className="modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) setExportOpen(false); }}><section className="export-modal" role="dialog" aria-modal="true" aria-labelledby="export-title"><div className="modal-heading"><div><span className="eyebrow">{drawing.name}</span><h2 id="export-title">{t.exportTitle}</h2></div><button onClick={() => setExportOpen(false)} aria-label={t.close}>×</button></div><div className="export-summary"><span className="file-stack">▧</span><div><strong>{selectedCount} {t.layers.toLowerCase()}</strong><small>{drawing.primitives.filter((entity) => drawing.layers.find((layer) => layer.name === entity.layer)?.selected).length} {t.prepared}</small></div></div><fieldset><legend>{t.organisation}</legend><label className={exportMode === "layers" ? "choice selected" : "choice"}><input type="radio" name="mode" checked={exportMode === "layers"} onChange={() => setExportMode("layers")} /><span className="radio-dot" /><div><strong>{t.perLayer}</strong><small>{selectedCount} × {Number(exportFormats.dxf) + Number(exportFormats.svg)} {t.files}</small></div></label><label className={exportMode === "filtered" ? "choice selected" : "choice"}><input type="radio" name="mode" checked={exportMode === "filtered"} onChange={() => setExportMode("filtered")} /><span className="radio-dot" /><div><strong>{t.filtered}</strong><small>{t.keepTogether}</small></div></label></fieldset><fieldset><legend>{t.outputs}</legend><div className="format-grid"><label className={exportFormats.dxf ? "format-choice selected" : "format-choice"}><input type="checkbox" checked={exportFormats.dxf} onChange={() => setExportFormats((value) => ({ ...value, dxf: !value.dxf }))} /><span>DXF</span><small>{t.editable}</small></label><label className={exportFormats.svg ? "format-choice selected" : "format-choice"}><input type="checkbox" checked={exportFormats.svg} onChange={() => setExportFormats((value) => ({ ...value, svg: !value.svg }))} /><span>SVG</span><small>{t.inkscape}</small></label></div></fieldset><label className="option-line"><input type="checkbox" defaultChecked /><span className="custom-check">✓</span>{t.blocks}</label><label className="option-line"><input type="checkbox" /><span className="custom-check">✓</span>{t.auxiliary}</label><div className="modal-actions"><button className="secondary-button" onClick={() => setExportOpen(false)}>{t.cancel}</button><button className="primary-button" onClick={createExport} disabled={!selectedCount || (!exportFormats.dxf && !exportFormats.svg)}><span>⇩</span>{t.download}</button></div></section></div>}
 
