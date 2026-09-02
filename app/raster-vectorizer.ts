@@ -184,7 +184,10 @@ function adaptiveBinary(gray: Uint8Array, width: number, height: number, globalT
       const area = (x1 - x0 + 1) * (y1 - y0 + 1);
       const sum = integral[(y1 + 1) * stride + x1 + 1] - integral[y0 * stride + x1 + 1] - integral[(y1 + 1) * stride + x0] + integral[y0 * stride + x0];
       const localMean = sum / area;
-      const threshold = Math.max(globalThreshold, localMean - 17);
+      // Cap the local threshold at the user value. Using max() here treated
+      // light paper shadows as black regions and produced dense scan-line
+      // bands that obscured the drawing.
+      const threshold = Math.min(globalThreshold, Math.max(32, localMean - 17));
       binary[y * width + x] = gray[y * width + x] < threshold ? 1 : 0;
     }
   }

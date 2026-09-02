@@ -23,7 +23,7 @@ import {
 } from "./cad-core";
 import { RasterOptions, vectorizeRaster } from "./raster-vectorizer";
 
-const APP_VERSION = "v20";
+const APP_VERSION = "v21";
 
 type Lang = "es" | "en" | "ar" | "fr" | "de" | "it" | "pt" | "zh" | "hi" | "ru" | "ja";
 type InstallPromptEvent = Event & {
@@ -736,7 +736,7 @@ export default function ArqueoCadMobile() {
   }
 
   function selectAll(selected: boolean) {
-    setDrawing((current) => current ? ({ ...current, layers: current.layers.map((layer) => ({ ...layer, selected: layer.auxiliary ? false : selected })) }) : current);
+    setDrawing((current) => current ? ({ ...current, layers: current.layers.map((layer) => ({ ...layer, selected: layer.auxiliary ? false : selected, visible: layer.auxiliary ? layer.visible : selected })) }) : current);
   }
 
   function eventPoint(event: ReactPointerEvent<SVGSVGElement>) {
