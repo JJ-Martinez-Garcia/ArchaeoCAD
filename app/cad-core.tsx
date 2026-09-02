@@ -348,6 +348,79 @@ function parsePoints(value: string) {
   return points;
 }
 
+// Convert SVG path curves to a dense polyline. VTracer's spline mode emits
+// cubic/quadratic Bézier commands; treating their control points as vertices
+// made the result visibly angular and lost the original curvature.
+function parsePathData(value: string) {
+  const tokens = value.match(/[a-zA-Z]|[-+]?(?:\d*\.\d+|\d+\.?)(?:[eE][-+]?\d+)?/g) ?? [];
+  const points: Point[] = [];
+  let index = 0;
+  let command = "M";
+  let current = { x: 0, y: 0 };
+  let start = { x: 0, y: 0 };
+  let lastControl: Point | null = null;
+  const isCommand = (token: string | undefined) => Boolean(token && /^[a-zA-Z]$/.test(token));
+  const number = () => Number(tokens[index++]);
+  const has = (count: number) => index + count <= tokens.length && !isCommand(tokens[index]);
+  const add = (point: Point) => { points.push({ x: point.x, y: -point.y }); current = point; };
+  const sampleCubic = (p0: Point, p1: Point, p2: Point, p3: Point) => {
+    for (let step = 1; step <= 10; step += 1) {
+      const t = step / 10;
+      const mt = 1 - t;
+      add({ x: mt ** 3 * p0.x + 3 * mt ** 2 * t * p1.x + 3 * mt * t ** 2 * p2.x + t ** 3 * p3.x, y: mt ** 3 * p0.y + 3 * mt ** 2 * t * p1.y + 3 * mt * t ** 2 * p2.y + t ** 3 * p3.y });
+    }
+  };
+  const sampleQuadratic = (p0: Point, p1: Point, p2: Point) => {
+    for (let step = 1; step <= 8; step += 1) {
+      const t = step / 8;
+      const mt = 1 - t;
+      add({ x: mt ** 2 * p0.x + 2 * mt * t * p1.x + t ** 2 * p2.x, y: mt ** 2 * p0.y + 2 * mt * t * p1.y + t ** 2 * p2.y });
+    }
+  };
+  while (index < tokens.length) {
+    if (isCommand(tokens[index])) command = tokens[index++];
+    const relative = command === command.toLowerCase();
+    const op = command.toUpperCase();
+    if (op === "Z") { add(start); lastControl = null; command = relative ? "m" : "M"; continue; }
+    if (op === "M" && has(2)) {
+      const next = { x: number() + (relative ? current.x : 0), y: number() + (relative ? current.y : 0) };
+      add(next); start = next; lastControl = null; command = relative ? "l" : "L"; continue;
+    }
+    if (op === "L" && has(2)) { add({ x: number() + (relative ? current.x : 0), y: number() + (relative ? current.y : 0) }); lastControl = null; continue; }
+    if (op === "H" && has(1)) { add({ x: number() + (relative ? current.x : 0), y: current.y }); lastControl = null; continue; }
+    if (op === "V" && has(1)) { add({ x: current.x, y: number() + (relative ? current.y : 0) }); lastControl = null; continue; }
+    if (op === "C" && has(6)) {
+      const p0 = current;
+      const p1 = { x: number() + (relative ? p0.x : 0), y: number() + (relative ? p0.y : 0) };
+      const p2 = { x: number() + (relative ? p0.x : 0), y: number() + (relative ? p0.y : 0) };
+      const p3 = { x: number() + (relative ? p0.x : 0), y: number() + (relative ? p0.y : 0) };
+      sampleCubic(p0, p1, p2, p3); lastControl = p2; continue;
+    }
+    if (op === "S" && has(4)) {
+      const p0 = current;
+      const p1 = lastControl ? { x: 2 * p0.x - lastControl.x, y: 2 * p0.y - lastControl.y } : p0;
+      const p2 = { x: number() + (relative ? p0.x : 0), y: number() + (relative ? p0.y : 0) };
+      const p3 = { x: number() + (relative ? p0.x : 0), y: number() + (relative ? p0.y : 0) };
+      sampleCubic(p0, p1, p2, p3); lastControl = p2; continue;
+    }
+    if (op === "Q" && has(4)) {
+      const p0 = current;
+      const p1 = { x: number() + (relative ? p0.x : 0), y: number() + (relative ? p0.y : 0) };
+      const p2 = { x: number() + (relative ? p0.x : 0), y: number() + (relative ? p0.y : 0) };
+      sampleQuadratic(p0, p1, p2); lastControl = p1; continue;
+    }
+    if (op === "T" && has(2)) {
+      const p0 = current;
+      const p1 = lastControl ? { x: 2 * p0.x - lastControl.x, y: 2 * p0.y - lastControl.y } : p0;
+      const p2 = { x: number() + (relative ? p0.x : 0), y: number() + (relative ? p0.y : 0) };
+      sampleQuadratic(p0, p1, p2); lastControl = p1; continue;
+    }
+    // Malformed path or unsupported command: advance to avoid an infinite loop.
+    index += 1;
+  }
+  return points;
+}
+
 export function parseSvg(text: string, name: string): Drawing {
   const doc = new DOMParser().parseFromString(text, "image/svg+xml");
   if (doc.querySelector("parsererror")) throw new Error("SVG no válido");
@@ -379,7 +452,7 @@ export function parseSvg(text: string, name: string): Drawing {
     } else if (tag === "text") {
       primitives.push({ ...common, type: "text", center: { x: Number(element.getAttribute("x")) || 0, y: -(Number(element.getAttribute("y")) || 0) }, text: element.textContent ?? "", height: Number(element.getAttribute("font-size")) || 12 });
     } else if (tag === "path") {
-      const points = parsePoints((element.getAttribute("d") ?? "").replace(/[A-Za-z]/g, " ")).map((point) => ({ x: point.x, y: -point.y }));
+      const points = parsePathData(element.getAttribute("d") ?? "");
       if (points.length > 1) primitives.push({ ...common, type: "polyline", points, closed: /z\s*$/i.test(element.getAttribute("d") ?? "") });
     }
   });

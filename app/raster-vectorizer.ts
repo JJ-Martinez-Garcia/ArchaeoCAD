@@ -564,12 +564,14 @@ async function vectorizeWithVTracer(binary: Uint8Array, width: number, height: n
       canvas_id: canvas.id,
       svg_id: svg.id,
       mode: options.detail === 3 ? "spline" : "polygon",
-      corner_threshold: 60,
-      length_threshold: Math.max(1, options.simplify * 2),
-      max_iterations: options.detail === 3 ? 14 : 9,
-      splice_threshold: 45,
-      filter_speckle: options.detail === 3 ? 2 : options.detail === 2 ? 4 : 7,
-      path_precision: 3,
+      // Preserve corners and short bends; simplification is applied later to
+      // the sampled CAD polyline, not by aggressively discarding VTracer nodes.
+      corner_threshold: options.detail === 3 ? 42 : 52,
+      length_threshold: Math.max(0.35, options.simplify * (options.detail === 3 ? 0.75 : 1.1)),
+      max_iterations: options.detail === 3 ? 20 : options.detail === 2 ? 14 : 10,
+      splice_threshold: options.detail === 3 ? 28 : 38,
+      filter_speckle: options.detail === 3 ? 2 : options.detail === 2 ? 3 : 5,
+      path_precision: options.detail === 3 ? 5 : 4,
     }));
     converter.init();
     await new Promise<void>((resolve, reject) => {
