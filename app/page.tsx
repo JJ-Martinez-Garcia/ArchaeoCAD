@@ -23,7 +23,7 @@ import {
 } from "./cad-core";
 import { RasterOptions, vectorizeRaster } from "./raster-vectorizer";
 
-const APP_VERSION = "v13";
+const APP_VERSION = "v14";
 
 type Lang = "es" | "en" | "ar" | "fr" | "de" | "it" | "pt" | "zh" | "hi" | "ru" | "ja";
 type InstallPromptEvent = Event & {
@@ -98,7 +98,7 @@ const copy = {
     dwgTitle: "DWG necesita conversión",
     dwgBody: "En móvil, convierte primero el archivo a DXF. Así se conserva la geometría sin interpretar un formato propietario en el navegador.",
     rasterTitle: "Vectorizar imagen raster",
-    rasterIntro: "Convierte líneas de un escaneado o fotografía en trazos centrales editables. El resultado siempre debe revisarse.",
+    rasterIntro: "Convierte líneas de un escaneado o fotografía en trazos centrales editables y reconoce textos con OCR. El resultado siempre debe revisarse.",
     sourceImage: "IMAGEN DE ORIGEN",
     detection: "Detección",
     threshold: "Umbral de negro",
@@ -110,7 +110,9 @@ const copy = {
     detailBalanced: "Equilibrado",
     detailFast: "Rápido",
     classify: "Clasificar por tipos de línea",
-    classifyHelp: "Separa estructuras, curvas de nivel, ejes, tramas, símbolos, textos y marco; marca los trazos ambiguos para revisarlos.",
+    classifyHelp: "Separa estructuras, curvas de nivel, ejes, tramas, símbolos, textos y marco; el OCR añade palabras y cotas editables.",
+    ocr: "Reconocer textos (OCR)",
+    ocrHelp: "Detecta palabras, letras y cotas y las añade como texto editable en su propia capa.",
     calibration: "Escala real (opcional)",
     realWidth: "Ancho real de la imagen",
     widthPlaceholder: "Ej. 25",
@@ -224,7 +226,7 @@ const copy = {
     dwgTitle: "DWG needs conversion",
     dwgBody: "On mobile, convert the file to DXF first. This preserves geometry without interpreting a proprietary format in the browser.",
     rasterTitle: "Vectorize raster image",
-    rasterIntro: "Turn lines from a scan or photograph into editable centre-line paths. The result should always be reviewed.",
+    rasterIntro: "Turn lines from a scan or photograph into editable centre-line paths and recognise text with OCR. The result should always be reviewed.",
     sourceImage: "SOURCE IMAGE",
     detection: "Detection",
     threshold: "Black threshold",
@@ -236,7 +238,9 @@ const copy = {
     detailBalanced: "Balanced",
     detailFast: "Fast",
     classify: "Classify line types",
-    classifyHelp: "Separates structures, contours, axes, hatching, symbols, text and frame; flags ambiguous strokes for review.",
+    classifyHelp: "Separates structures, contours, axes, hatching, symbols, text and frame; OCR adds editable labels and dimensions.",
+    ocr: "Recognize text (OCR)",
+    ocrHelp: "Detects words, labels and dimensions and adds them as editable text in their own layer.",
     calibration: "Real scale (optional)",
     realWidth: "Real image width",
     widthPlaceholder: "E.g. 25",
@@ -362,7 +366,9 @@ const copy = {
     detailBalanced: "متوازن",
     detailFast: "سريع",
     classify: "تصنيف أنواع الخطوط",
-    classifyHelp: "يفصل المنشآت وخطوط الكنتور والمحاور والتهشير والرموز والمقياس في طبقات.",
+    classifyHelp: "يفصل المنشآت وخطوط الكنتور والمحاور والتهشير والرموز والمقياس، ويضيف OCR النصوص القابلة للتحرير.",
+    ocr: "التعرف على النصوص (OCR)",
+    ocrHelp: "يكتشف الكلمات والرموز والأبعاد ويضيفها كنص قابل للتحرير في طبقة مستقلة.",
     calibration: "المقياس الحقيقي (اختياري)",
     realWidth: "العرض الحقيقي للصورة",
     widthPlaceholder: "مثال: 25",
@@ -461,6 +467,9 @@ function warningText(value: string, lang: Lang) {
     if (value.startsWith("Las capas se han clasificado automáticamente")) return "صُنفت الطبقات تلقائياً حسب الشكل والاستمرارية والاتجاه والكثافة؛ يُنصح بمراجعة العناصر الملتبسة.";
     if (value.startsWith("Escala calibrada automáticamente")) return "تمت معايرة المقياس تلقائياً باستخدام شريط المقياس الموجود في الصورة.";
     if (value.startsWith("La imagen no se ha calibrado")) return "لم تتم معايرة الصورة: تظهر القياسات بالبكسل أو بوحدات الرسم.";
+    if (value.startsWith("OCR:")) return value.replace(/^OCR:\s*/, "التعرف الضوئي على الحروف: ").replace("textos añadidos a 08_TEXTOS_EDITABLES.", "نصوص أضيفت إلى 08_TEXTOS_EDITABLES.");
+    if (value.startsWith("OCR no ha encontrado")) return "لم يعثر OCR على نصوص بدرجة ثقة كافية؛ راجع الصورة الممسوحة.";
+    if (value.includes("baja confianza de clasificación")) return value.replace(/trazos tienen baja confianza de clasificación y conviene revisarlos\./, "عناصر ذات ثقة تصنيف منخفضة ويُنصح بمراجعتها.");
     return value;
   }
   if (complex) return `${complex[1]} complex entities are shown in simplified form; use the desktop application when the original CAD structure must be preserved.`;
@@ -469,6 +478,9 @@ function warningText(value: string, lang: Lang) {
   if (value.startsWith("Las capas se han clasificado automáticamente")) return "Layers were classified automatically using shape, continuity, orientation and density; ambiguous elements should be reviewed.";
   if (value.startsWith("Escala calibrada automáticamente")) return value.replace("Escala calibrada automáticamente con una barra gráfica de", "Scale calibrated automatically with a graphic scale of").replace("metros", "metres").replace("centímetros", "centimetres").replace("milímetros", "millimetres");
   if (value.startsWith("La imagen no se ha calibrado")) return "The image was not calibrated: measurements are shown in pixels/drawing units.";
+  if (value.startsWith("OCR:")) return value.replace(/^OCR:\s*/, "OCR: ").replace("textos añadidos a 08_TEXTOS_EDITABLES.", "text items added to 08_TEXTOS_EDITABLES.");
+  if (value.startsWith("OCR no ha encontrado")) return "OCR did not find text with enough confidence; review the scan.";
+  if (value.includes("baja confianza de clasificación")) return value.replace(/trazos tienen baja confianza de clasificación y conviene revisarlos\./, "strokes have low classification confidence and should be reviewed.");
   return value;
 }
 
@@ -679,6 +691,7 @@ export default function ArqueoCadMobile() {
         unit: rasterUnit,
         detail,
         classify: classifyLines,
+        ocr: true,
         scaleBarLength: detectScale && Number(scaleBarLength) > 0 ? Number(scaleBarLength) : null,
       });
       closeRaster();

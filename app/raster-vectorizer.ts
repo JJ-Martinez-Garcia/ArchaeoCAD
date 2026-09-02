@@ -1,6 +1,8 @@
 import { getBounds, parseSvg } from "./cad-core";
 import type { Drawing, Layer, Point, Primitive } from "./cad-core";
 import { BinaryImageConverter, ensureVTracer } from "./vtracer/browser";
+import { recognizeRasterText } from "./ocr";
+import type { OcrText } from "./ocr";
 
 export type RasterOptions = {
   threshold: number;
@@ -10,6 +12,7 @@ export type RasterOptions = {
   detail: 1 | 2 | 3;
   classify: boolean;
   scaleBarLength: number | null;
+  ocr: boolean;
 };
 
 type Neighbour = { index: number; direction: number };
@@ -417,7 +420,21 @@ function raf() {
     : (callback: FrameRequestCallback) => window.setTimeout(() => callback(performance.now()), 0);
 }
 
-async function vectorizeWithVTracer(binary: Uint8Array, width: number, height: number, file: File, options: RasterOptions, detectedScalePixels: number | null): Promise<Drawing | null> {
+function ocrPrimitives(texts: OcrText[], width: number, height: number, scale: number): Primitive[] {
+  return texts.map((text, index) => ({
+    id: `ocr-${index}`,
+    type: "text",
+    layer: "08_TEXTOS_EDITABLES",
+    color: layerPresets["08_TEXTOS_EDITABLES"].color,
+    center: { x: ((text.box.x0 + text.box.x1) / 2) * scale, y: (height - (text.box.y0 + text.box.y1) / 2) * scale },
+    text: text.text,
+    height: Math.max(1, (text.box.y1 - text.box.y0) * scale * 0.82),
+    rotation: 0,
+    lineWeight: layerPresets["08_TEXTOS_EDITABLES"].lineWeight,
+  }));
+}
+
+async function vectorizeWithVTracer(binary: Uint8Array, width: number, height: number, file: File, options: RasterOptions, detectedScalePixels: number | null, ocrTexts: OcrText[]): Promise<Drawing | null> {
   const serial = vtracerSerial += 1;
   const canvas = document.createElement("canvas");
   const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
@@ -486,8 +503,9 @@ async function vectorizeWithVTracer(binary: Uint8Array, width: number, height: n
       if (primitive.type !== "polyline" || !primitive.points?.length) return primitive;
       const feature = featureByPrimitive.get(index);
       const layer = options.classify && feature ? feature.layer : "01_LINEAS_VECTOR";
-      return { ...primitive, layer, color: layerPresets[layer].color, lineWeight: layerPresets[layer].lineWeight, points: primitive.points.map((point) => ({ x: point.x * scale, y: point.y * scale })) };
+      return { ...primitive, layer, color: layerPresets[layer].color, lineWeight: layerPresets[layer].lineWeight, points: primitive.points.map((point) => ({ x: point.x * scale, y: (height + point.y) * scale })) };
     });
+    primitives.push(...ocrPrimitives(ocrTexts, width, height, scale));
     const counts = new Map<string, number>();
     primitives.forEach((primitive) => counts.set(primitive.layer, (counts.get(primitive.layer) ?? 0) + 1));
     const layers = [...counts.entries()].map(([name, count]) => ({ ...(layerPresets[name] ?? layerPresets["01_LINEAS_VECTOR"]), name, count }));
@@ -500,6 +518,7 @@ async function vectorizeWithVTracer(binary: Uint8Array, width: number, height: n
       layers,
       warnings: [
         "Vectorización VTracer (WebAssembly) con trazado suavizado; revisa el resultado antes de usarlo como documentación definitiva.",
+        ...(options.ocr ? [ocrTexts.length ? `OCR: ${ocrTexts.length} textos añadidos a 08_TEXTOS_EDITABLES.` : "OCR no ha encontrado textos con confianza suficiente; revisa el escaneado."] : []),
         ...(ambiguous ? [`${ambiguous} trazos tienen baja confianza de clasificación y conviene revisarlos.`] : []),
       ],
     };
@@ -530,7 +549,8 @@ export async function vectorizeRaster(file: File, options: RasterOptions): Promi
   const gray = normaliseGray(context.getImageData(0, 0, width, height).data);
   const binary = adaptiveBinary(gray, width, height, options.threshold);
   const detectedScalePixels = options.scaleBarLength ? detectScaleBar(binary, width, height) : null;
-  const vtracerDrawing = await vectorizeWithVTracer(binary, width, height, file, options, detectedScalePixels);
+  const ocrTexts = options.ocr ? await recognizeRasterText(canvas) : [];
+  const vtracerDrawing = await vectorizeWithVTracer(binary, width, height, file, options, detectedScalePixels, ocrTexts);
   if (vtracerDrawing) return vtracerDrawing;
   const skeleton = thin(binary, width, height);
   const traced = tracePaths(skeleton, width, height);
@@ -565,6 +585,7 @@ export async function vectorizeRaster(file: File, options: RasterOptions): Promi
       lineWeight: preset.lineWeight,
     };
   }).filter((entity) => (entity.points?.length ?? 0) >= 2);
+  primitives.push(...ocrPrimitives(ocrTexts, width, height, scale));
   if (!primitives.length) throw new Error("No lines detected");
 
   const counts = new Map<string, number>();
@@ -577,6 +598,7 @@ export async function vectorizeRaster(file: File, options: RasterOptions): Promi
       ? "Las capas se han clasificado automáticamente por forma, continuidad, orientación y densidad; conviene revisar los elementos ambiguos."
       : "La geometría procede de una imagen y debe revisarse antes de usarla como documentación definitiva.",
   ];
+  if (options.ocr) warnings.push(ocrTexts.length ? `OCR: ${ocrTexts.length} textos añadidos a 08_TEXTOS_EDITABLES.` : "OCR no ha encontrado textos con confianza suficiente; revisa el escaneado.");
   if (ambiguous) warnings.push(`${ambiguous} trazos tienen baja confianza de clasificación y conviene revisarlos.`);
   if (automaticScale) warnings.push(`Escala calibrada automáticamente con una barra gráfica de ${options.scaleBarLength} ${unitName(options.unit)}.`);
   else if (!calibrated) warnings.push("La imagen no se ha calibrado: las medidas se expresan en píxeles/unidades de dibujo.");
