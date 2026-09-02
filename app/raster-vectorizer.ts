@@ -27,6 +27,7 @@ type PathFeature = {
   closed: boolean;
   layer: string;
   dashed: boolean;
+  confidence: number;
 };
 
 let vtracerSerial = 0;
@@ -44,7 +45,25 @@ const layerPresets: Record<string, Omit<Layer, "count">> = {
   "05_TRAMAS": { name: "05_TRAMAS", color: "#c98b52", visible: true, selected: true, lineWeight: 5 },
   "06_SIMBOLOS": { name: "06_SIMBOLOS", color: "#e0ad52", visible: true, selected: true, lineWeight: 5 },
   "07_ESCALA_NORTE": { name: "07_ESCALA_NORTE", color: "#f0c56e", visible: true, selected: true, lineWeight: 9 },
+  "08_TEXTOS_EDITABLES": { name: "08_TEXTOS_EDITABLES", color: "#8fd1e5", visible: true, selected: true, lineWeight: 3 },
+  "09_MARCO_LEYENDA": { name: "09_MARCO_LEYENDA", color: "#a8a29a", visible: true, selected: true, lineWeight: 5 },
+  "00_REFERENCIA_RASTER": { name: "00_REFERENCIA_RASTER", color: "#77736c", visible: true, selected: false, auxiliary: true, lineWeight: 1 },
   "01_LINEAS_VECTOR": { name: "01_LINEAS_VECTOR", color: "#f1efe8", visible: true, selected: true, lineWeight: 5 },
+};
+
+// Perfil de referencia extraído de planta_cigarralejo_vectorizada_capas.dxf.
+// No es un modelo entrenado: son prioridades suaves para que un escaneado
+// parecido al ejemplo no convierta todos los trazos en estructuras.
+const referenceLayerPriors: Record<string, number> = {
+  "01_ESTRUCTURAS": 0.63,
+  "03_ANOTACIONES": 0.21,
+  "06_SIMBOLOS": 0.05,
+  "07_ESCALA_NORTE": 0.045,
+  "08_TEXTOS_EDITABLES": 0.02,
+  "05_TRAMAS": 0.018,
+  "02_CURVAS_NIVEL": 0.011,
+  "04_EJES_SECCIONES": 0.006,
+  "09_MARCO_LEYENDA": 0.008,
 };
 
 function neighbourEntries(data: Uint8Array, width: number, height: number, index: number) {
@@ -273,6 +292,7 @@ function pathFeature(pixels: number[], width: number): PathFeature {
     closed: chord <= 2.5 && length > 8,
     layer: "01_ESTRUCTURAS",
     dashed: false,
+    confidence: 0,
   };
 }
 
@@ -299,12 +319,19 @@ function classify(features: PathFeature[], width: number, height: number) {
     const hatchKey = `${Math.round(feature.angle / (Math.PI / 12))}:${Math.floor(feature.midX / (width / 7))}:${Math.floor(feature.midY / (height / 5))}`;
     const inScale = feature.midY > height * 0.76 && feature.midY < height * 0.91 && feature.midX > width * 0.12 && feature.midX < width * 0.53;
     const inNorth = feature.midY < height * 0.34 && feature.midX > width * 0.62;
+    const nearBorder = (feature.midX < width * 0.025 || feature.midX > width * 0.975 || feature.midY < height * 0.025 || feature.midY > height * 0.975)
+      && feature.length > diagonal * 0.08 && feature.straightness > 0.88;
+    const textLike = feature.closed && feature.points.length >= 6 && size < diagonal * 0.026 && feature.meanTurn > 0.22;
     if (inScale || inNorth) {
       feature.layer = "07_ESCALA_NORTE";
+    } else if (nearBorder) {
+      feature.layer = "09_MARCO_LEYENDA";
+    } else if (textLike) {
+      feature.layer = "08_TEXTOS_EDITABLES";
     } else if (feature.length > diagonal * 0.13 && feature.straightness > 0.92 && horizontalOrVertical) {
       feature.layer = "04_EJES_SECCIONES";
       feature.dashed = true;
-    } else if ((hatchBuckets.get(hatchKey) ?? 0) >= 7 && feature.straightness > 0.92) {
+    } else if ((hatchBuckets.get(hatchKey) ?? 0) >= 5 && feature.straightness > 0.9 && feature.meanTurn < 0.35) {
       feature.layer = "05_TRAMAS";
     } else if (feature.length > diagonal * 0.15 && feature.straightness < 0.78 && feature.meanTurn < 0.55) {
       feature.layer = "02_CURVAS_NIVEL";
@@ -315,6 +342,20 @@ function classify(features: PathFeature[], width: number, height: number) {
     } else {
       feature.layer = "01_ESTRUCTURAS";
     }
+    const prior = referenceLayerPriors[feature.layer] ?? 0.01;
+    const evidence = [
+      inScale || inNorth,
+      nearBorder,
+      textLike,
+      feature.closed,
+      horizontalOrVertical,
+      feature.straightness > 0.9,
+      feature.length > diagonal * 0.13,
+      (hatchBuckets.get(hatchKey) ?? 0) >= 5,
+    ].filter(Boolean).length;
+    // Confidence is deliberately exposed as a review signal, not a claim of
+    // semantic certainty. Ambiguous traces stay editable in their layer.
+    feature.confidence = Math.min(0.96, 0.26 + evidence * 0.085 + Math.min(prior / 0.63, 1) * 0.14);
   });
 
   // Short collinear horizontal/vertical strokes form dashed axes. Group them
@@ -338,8 +379,10 @@ function classify(features: PathFeature[], width: number, height: number) {
     group.forEach((feature) => {
       feature.layer = "04_EJES_SECCIONES";
       feature.dashed = true;
+      feature.confidence = Math.min(0.98, feature.confidence + 0.16);
     });
   });
+  return features.filter((feature) => feature.confidence < 0.5).length;
 }
 
 function detectScaleBar(binary: Uint8Array, width: number, height: number) {
@@ -436,7 +479,7 @@ async function vectorizeWithVTracer(binary: Uint8Array, width: number, height: n
       featureByPrimitive.set(index, pathFeature(pixels, width));
     });
     const features = [...featureByPrimitive.values()];
-    if (options.classify && features.length) classify(features, Math.max(bounds.width, 1), Math.max(bounds.height, 1));
+    const ambiguous = options.classify && features.length ? classify(features, Math.max(bounds.width, 1), Math.max(bounds.height, 1)) : 0;
     const scaleBarScale = options.scaleBarLength && detectedScalePixels ? options.scaleBarLength / detectedScalePixels : null;
     const scale = options.realWidth && options.realWidth > 0 ? options.realWidth / Math.max(bounds.width, 1) : scaleBarScale ?? 1;
     const primitives = parsed.primitives.map((primitive, index) => {
@@ -455,7 +498,10 @@ async function vectorizeWithVTracer(binary: Uint8Array, width: number, height: n
       unit: calibrated ? unitName(options.unit) : "unidades de dibujo",
       primitives,
       layers,
-      warnings: ["Vectorización VTracer (WebAssembly) con trazado suavizado; revisa el resultado antes de usarlo como documentación definitiva."],
+      warnings: [
+        "Vectorización VTracer (WebAssembly) con trazado suavizado; revisa el resultado antes de usarlo como documentación definitiva.",
+        ...(ambiguous ? [`${ambiguous} trazos tienen baja confianza de clasificación y conviene revisarlos.`] : []),
+      ],
     };
   } catch {
     return null;
@@ -490,8 +536,8 @@ export async function vectorizeRaster(file: File, options: RasterOptions): Promi
   const traced = tracePaths(skeleton, width, height);
   const minimumPixels = options.detail === 3 ? 2 : options.detail === 2 ? 3 : 4;
   const features = traced.filter((path) => path.length >= minimumPixels).map((path) => pathFeature(path, width));
-  if (options.classify) classify(features, width, height);
-  else features.forEach((feature) => { feature.layer = "01_LINEAS_VECTOR"; });
+  const ambiguous = options.classify ? classify(features, width, height) : 0;
+  if (!options.classify) features.forEach((feature) => { feature.layer = "01_LINEAS_VECTOR"; });
 
   let scale = 1;
   let calibrated = false;
@@ -531,6 +577,7 @@ export async function vectorizeRaster(file: File, options: RasterOptions): Promi
       ? "Las capas se han clasificado automáticamente por forma, continuidad, orientación y densidad; conviene revisar los elementos ambiguos."
       : "La geometría procede de una imagen y debe revisarse antes de usarla como documentación definitiva.",
   ];
+  if (ambiguous) warnings.push(`${ambiguous} trazos tienen baja confianza de clasificación y conviene revisarlos.`);
   if (automaticScale) warnings.push(`Escala calibrada automáticamente con una barra gráfica de ${options.scaleBarLength} ${unitName(options.unit)}.`);
   else if (!calibrated) warnings.push("La imagen no se ha calibrado: las medidas se expresan en píxeles/unidades de dibujo.");
   return {

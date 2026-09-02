@@ -23,7 +23,7 @@ import {
 } from "./cad-core";
 import { RasterOptions, vectorizeRaster } from "./raster-vectorizer";
 
-const APP_VERSION = "v12";
+const APP_VERSION = "v13";
 
 type Lang = "es" | "en" | "ar" | "fr" | "de" | "it" | "pt" | "zh" | "hi" | "ru" | "ja";
 type InstallPromptEvent = Event & {
@@ -110,7 +110,7 @@ const copy = {
     detailBalanced: "Equilibrado",
     detailFast: "Rápido",
     classify: "Clasificar por tipos de línea",
-    classifyHelp: "Separa estructuras, curvas de nivel, ejes, tramas, símbolos y escala en capas.",
+    classifyHelp: "Separa estructuras, curvas de nivel, ejes, tramas, símbolos, textos y marco; marca los trazos ambiguos para revisarlos.",
     calibration: "Escala real (opcional)",
     realWidth: "Ancho real de la imagen",
     widthPlaceholder: "Ej. 25",
@@ -236,7 +236,7 @@ const copy = {
     detailBalanced: "Balanced",
     detailFast: "Fast",
     classify: "Classify line types",
-    classifyHelp: "Separates structures, contours, axes, hatching, symbols and scale into layers.",
+    classifyHelp: "Separates structures, contours, axes, hatching, symbols, text and frame; flags ambiguous strokes for review.",
     calibration: "Real scale (optional)",
     realWidth: "Real image width",
     widthPlaceholder: "E.g. 25",

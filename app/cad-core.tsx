@@ -440,6 +440,9 @@ export function toDxf(primitives: Primitive[], unit: string) {
     "05_TRAMAS": 30,
     "06_SIMBOLOS": 4,
     "07_ESCALA_NORTE": 2,
+    "08_TEXTOS_EDITABLES": 5,
+    "09_MARCO_LEYENDA": 8,
+    "00_REFERENCIA_RASTER": 8,
   };
   const layerNames = [...new Set(primitives.map((entity) => entity.layer))].sort();
   const layerStyle = (name: string) => primitives.find((entity) => entity.layer === name);
