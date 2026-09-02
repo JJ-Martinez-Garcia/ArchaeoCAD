@@ -1,4 +1,6 @@
+import { getBounds, parseSvg } from "./cad-core";
 import type { Drawing, Layer, Point, Primitive } from "./cad-core";
+import { BinaryImageConverter, ensureVTracer } from "./vtracer/browser";
 
 export type RasterOptions = {
   threshold: number;
@@ -26,6 +28,8 @@ type PathFeature = {
   layer: string;
   dashed: boolean;
 };
+
+let vtracerSerial = 0;
 
 const directions = [
   [-1, -1], [0, -1], [1, -1], [1, 0],
@@ -364,6 +368,104 @@ function unitName(unit: RasterOptions["unit"]) {
   return "unidades de dibujo";
 }
 
+function raf() {
+  return typeof requestAnimationFrame === "function"
+    ? requestAnimationFrame
+    : (callback: FrameRequestCallback) => window.setTimeout(() => callback(performance.now()), 0);
+}
+
+async function vectorizeWithVTracer(binary: Uint8Array, width: number, height: number, file: File, options: RasterOptions, detectedScalePixels: number | null): Promise<Drawing | null> {
+  const serial = vtracerSerial += 1;
+  const canvas = document.createElement("canvas");
+  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  canvas.id = `arqueocad-vtracer-canvas-${serial}`;
+  svg.id = `arqueocad-vtracer-svg-${serial}`;
+  canvas.width = width;
+  canvas.height = height;
+  svg.setAttribute("width", String(width));
+  svg.setAttribute("height", String(height));
+  svg.setAttribute("viewBox", `0 0 ${width} ${height}`);
+  canvas.style.display = "none";
+  svg.style.display = "none";
+  document.body.append(canvas, svg);
+  let converter: BinaryImageConverter | null = null;
+  try {
+    await ensureVTracer();
+    const context = canvas.getContext("2d", { willReadFrequently: true });
+    if (!context) return null;
+    const image = context.createImageData(width, height);
+    for (let index = 0; index < binary.length; index += 1) {
+      const value = binary[index] ? 0 : 255;
+      const offset = index * 4;
+      image.data[offset] = value;
+      image.data[offset + 1] = value;
+      image.data[offset + 2] = value;
+      image.data[offset + 3] = 255;
+    }
+    context.putImageData(image, 0, 0);
+    converter = BinaryImageConverter.new_with_string(JSON.stringify({
+      canvas_id: canvas.id,
+      svg_id: svg.id,
+      mode: options.detail === 3 ? "spline" : "polygon",
+      corner_threshold: 60,
+      length_threshold: Math.max(1, options.simplify * 2),
+      max_iterations: options.detail === 3 ? 14 : 9,
+      splice_threshold: 45,
+      filter_speckle: options.detail === 3 ? 2 : options.detail === 2 ? 4 : 7,
+      path_precision: 3,
+    }));
+    converter.init();
+    await new Promise<void>((resolve, reject) => {
+      const step = () => {
+        try {
+          if (converter?.tick()) resolve();
+          else raf()(step);
+        } catch (error) {
+          reject(error);
+        }
+      };
+      raf()(step);
+    });
+    const parsed = parseSvg(new XMLSerializer().serializeToString(svg), file.name);
+    if (!parsed.primitives.length) return null;
+    const bounds = getBounds(parsed.primitives);
+    const featureByPrimitive = new Map<number, PathFeature>();
+    parsed.primitives.forEach((primitive, index) => {
+      if (primitive.type !== "polyline" || !primitive.points?.length) return;
+      const pixels = primitive.points.map((point) => Math.round(-point.y) * width + Math.round(point.x));
+      featureByPrimitive.set(index, pathFeature(pixels, width));
+    });
+    const features = [...featureByPrimitive.values()];
+    if (options.classify && features.length) classify(features, Math.max(bounds.width, 1), Math.max(bounds.height, 1));
+    const scaleBarScale = options.scaleBarLength && detectedScalePixels ? options.scaleBarLength / detectedScalePixels : null;
+    const scale = options.realWidth && options.realWidth > 0 ? options.realWidth / Math.max(bounds.width, 1) : scaleBarScale ?? 1;
+    const primitives = parsed.primitives.map((primitive, index) => {
+      if (primitive.type !== "polyline" || !primitive.points?.length) return primitive;
+      const feature = featureByPrimitive.get(index);
+      const layer = options.classify && feature ? feature.layer : "01_LINEAS_VECTOR";
+      return { ...primitive, layer, color: layerPresets[layer].color, lineWeight: layerPresets[layer].lineWeight, points: primitive.points.map((point) => ({ x: point.x * scale, y: point.y * scale })) };
+    });
+    const counts = new Map<string, number>();
+    primitives.forEach((primitive) => counts.set(primitive.layer, (counts.get(primitive.layer) ?? 0) + 1));
+    const layers = [...counts.entries()].map(([name, count]) => ({ ...(layerPresets[name] ?? layerPresets["01_LINEAS_VECTOR"]), name, count }));
+    const calibrated = Boolean((options.realWidth && options.realWidth > 0) || scaleBarScale);
+    return {
+      name: file.name.replace(/\.[^.]+$/, "") + "_vectorizado.dxf",
+      format: "RASTER",
+      unit: calibrated ? unitName(options.unit) : "unidades de dibujo",
+      primitives,
+      layers,
+      warnings: ["Vectorización VTracer (WebAssembly) con trazado suavizado; revisa el resultado antes de usarlo como documentación definitiva."],
+    };
+  } catch {
+    return null;
+  } finally {
+    converter?.free();
+    canvas.remove();
+    svg.remove();
+  }
+}
+
 export async function vectorizeRaster(file: File, options: RasterOptions): Promise<Drawing> {
   const bitmap = await createImageBitmap(file);
   const detailLimit = options.detail === 3 ? 1700 : options.detail === 2 ? 1400 : 1050;
@@ -382,6 +484,8 @@ export async function vectorizeRaster(file: File, options: RasterOptions): Promi
   const gray = normaliseGray(context.getImageData(0, 0, width, height).data);
   const binary = adaptiveBinary(gray, width, height, options.threshold);
   const detectedScalePixels = options.scaleBarLength ? detectScaleBar(binary, width, height) : null;
+  const vtracerDrawing = await vectorizeWithVTracer(binary, width, height, file, options, detectedScalePixels);
+  if (vtracerDrawing) return vtracerDrawing;
   const skeleton = thin(binary, width, height);
   const traced = tracePaths(skeleton, width, height);
   const minimumPixels = options.detail === 3 ? 2 : options.detail === 2 ? 3 : 4;

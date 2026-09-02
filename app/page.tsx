@@ -23,7 +23,7 @@ import {
 } from "./cad-core";
 import { RasterOptions, vectorizeRaster } from "./raster-vectorizer";
 
-const APP_VERSION = "v11";
+const APP_VERSION = "v12";
 
 type Lang = "es" | "en" | "ar" | "fr" | "de" | "it" | "pt" | "zh" | "hi" | "ru" | "ja";
 type InstallPromptEvent = Event & {
@@ -124,7 +124,7 @@ const copy = {
     rasterReady: "Imagen vectorizada",
     noLines: "No se han detectado líneas. Prueba a subir el umbral.",
     rasterFeature: "Adelgazado de trazo",
-    rasterFeatureBody: "Busca el eje central para evitar las dobles líneas típicas de la vectorización por contornos.",
+    rasterFeatureBody: "VTracer WebAssembly suaviza y simplifica los trazos localmente; revisa el resultado antes de exportar.",
     install: "Instalar",
     installTitle: "Instala ArqueoCAD",
     installBody: "Úsala como una app independiente, con acceso desde la pantalla de inicio y funcionamiento sin conexión para los archivos ya cargados.",
@@ -250,7 +250,7 @@ const copy = {
     rasterReady: "Image vectorized",
     noLines: "No lines were detected. Try raising the threshold.",
     rasterFeature: "Centre-line thinning",
-    rasterFeatureBody: "Finds the centre of each stroke to avoid the double lines produced by contour tracing.",
+    rasterFeatureBody: "VTracer WebAssembly smooths and simplifies strokes locally; review the result before exporting.",
     install: "Install",
     installTitle: "Install ArqueoCAD",
     installBody: "Use it as a standalone app, open it from your home screen and keep access to previously loaded files while offline.",
