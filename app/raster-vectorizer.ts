@@ -490,19 +490,32 @@ function stripImageFrame(binary: Uint8Array, width: number, height: number) {
 
 function detectScaleBar(binary: Uint8Array, width: number, height: number) {
   let best = 0;
-  const startY = Math.floor(height * 0.72);
-  const endY = Math.floor(height * 0.91);
-  const startX = Math.floor(width * 0.1);
-  const endX = Math.floor(width * 0.62);
+  // Scale bars are commonly tucked into the lower-left corner (sometimes
+  // within the first 2% of the image), and the label can sit below 90% of the
+  // raster. Search the wider lower band rather than assuming a centred bar.
+  const startY = Math.floor(height * 0.78);
+  const endY = Math.floor(height * 0.97);
+  const startX = Math.floor(width * 0.01);
+  const endX = Math.floor(width * 0.58);
   for (let y = startY; y < endY; y += 1) {
-    let run = 0;
+    let minX = width;
+    let maxX = -1;
+    let ink = 0;
+    let runs = 0;
+    let inRun = false;
     for (let x = startX; x < endX; x += 1) {
-      if (binary[y * width + x]) run += 1;
-      else {
-        if (run > best && run > width * 0.1 && run < width * 0.35) best = run;
-        run = 0;
-      }
+      if (binary[y * width + x]) {
+        minX = Math.min(minX, x);
+        maxX = Math.max(maxX, x);
+        ink += 1;
+        if (!inRun) runs += 1;
+        inRun = true;
+      } else inRun = false;
     }
+    const span = maxX >= minX ? maxX - minX + 1 : 0;
+    // A graphic bar has several alternating segments. Reject long isolated
+    // contour strokes and tiny annotation fragments.
+    if (runs >= 3 && span > width * 0.05 && span < width * 0.42 && ink > width * 0.012) best = Math.max(best, span);
   }
   return best || null;
 }
