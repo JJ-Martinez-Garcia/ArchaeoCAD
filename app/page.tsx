@@ -24,7 +24,7 @@ import {
 } from "./cad-core";
 import { RasterOptions, vectorizeRaster } from "./raster-vectorizer";
 
-const APP_VERSION = "v27";
+const APP_VERSION = "v28";
 
 type VectorCategory = "draw" | "modify" | "geometry" | "precision" | "organize";
 type VectorTool = "select" | "point" | "line" | "polyline" | "polygon" | "rectangle" | "circle" | "arc" | "move" | "copy" | "rotate" | "scale" | "mirror" | "offset" | "vertices" | "trim" | "extend" | "split" | "join" | "explode" | "snap" | "ortho" | "grid" | "coordinates" | "layers" | "properties" | "order";
@@ -258,6 +258,9 @@ const copy = {
     reviewHelp: "Estas entidades tienen menor confianza. Puedes cambiar su capa aquí y exportar la corrección.",
     reviewTarget: "Mover a capa",
     confidenceLabel: "confianza",
+    projects: "Proyectos creados",
+    noProjects: "Todavía no hay proyectos guardados en este dispositivo.",
+    deleteProject: "Borrar proyecto",
   },
   en: {
     brandTag: "FIELD DRAWING",
@@ -390,6 +393,9 @@ const copy = {
     reviewHelp: "These entities have lower confidence. Change their layer here and export the correction.",
     reviewTarget: "Move to layer",
     confidenceLabel: "confidence",
+    projects: "Created projects",
+    noProjects: "No projects have been saved on this device yet.",
+    deleteProject: "Delete project",
   },
   ar: {
     brandTag: "الرسم الميداني",
@@ -559,6 +565,7 @@ function browserLanguage(): Lang {
 }
 
 type RasterJob = { file: File; url: string };
+type RecentProject = { id: string; name: string; format: Drawing["format"]; entities: number; layers: number; createdAt: number };
 
 function isRaster(extension?: string) {
   return ["png", "jpg", "jpeg", "webp", "bmp"].includes(extension ?? "");
@@ -594,6 +601,13 @@ function warningText(value: string, lang: Lang) {
 export default function ArqueoCadMobile() {
   const [lang, setLang] = useState<Lang>("es");
   const [drawing, setDrawing] = useState<Drawing | null>(null);
+  const [recentProjects, setRecentProjects] = useState<RecentProject[]>(() => {
+    if (typeof window === "undefined") return [];
+    try {
+      const stored = JSON.parse(window.localStorage.getItem("arqueocad-projects") ?? "[]");
+      return Array.isArray(stored) ? stored.slice(0, 8) : [];
+    } catch { return []; }
+  });
   const [activePanel, setActivePanel] = useState<"layers" | "warnings" | null>(null);
   const [search, setSearch] = useState("");
   const [zoom, setZoom] = useState(1);
@@ -685,6 +699,10 @@ export default function ArqueoCadMobile() {
   }, [lang]);
 
   useEffect(() => {
+    window.localStorage.setItem("arqueocad-projects", JSON.stringify(recentProjects));
+  }, [recentProjects]);
+
+  useEffect(() => {
     const saved = window.localStorage.getItem("arqueocad-language") as Lang | null;
     if (saved && languageOptions.some((option) => option.code === saved)) setLang(saved);
     else setLang(browserLanguage());
@@ -737,6 +755,8 @@ export default function ArqueoCadMobile() {
 
   function loadDrawing(next: Drawing) {
     setDrawing(next);
+    const project: RecentProject = { id: `${next.name}-${next.format}`, name: next.name, format: next.format, entities: next.primitives.length, layers: next.layers.length, createdAt: Date.now() };
+    setRecentProjects((current) => [project, ...current.filter((item) => item.id !== project.id)].slice(0, 8));
     setSelectedEntityIds([]);
     setDraftPoints([]);
     setVectorTool("select");
@@ -745,6 +765,10 @@ export default function ArqueoCadMobile() {
     resetView();
     setActivePanel("layers");
     setToast(`${t.ready}: ${next.layers.length} ${t.layers.toLowerCase()}`);
+  }
+
+  function deleteRecentProject(id: string) {
+    setRecentProjects((current) => current.filter((project) => project.id !== id));
   }
 
   function openRaster(file: File) {
@@ -1149,7 +1173,7 @@ export default function ArqueoCadMobile() {
         {!drawing ? <section className="cover-area">
           <img className="cover-image" src="/og.png" alt="ArqueoCAD Mobile, planimetría de excavación" />
           <div className="cover-scrim" />
-          <div className="cover-copy"><span className="eyebrow">{t.coverEyebrow}</span><h1>{t.coverTitle}</h1><p>{t.coverBody}</p><div className="cover-actions"><button className="primary-button" onClick={() => planInputRef.current?.click()}>＋ {t.open}</button><button className="cover-secondary" onClick={() => rasterInputRef.current?.click()}>▧ {t.vectorize}</button></div><small className="cover-formats">{t.coverFormats}</small><div className="cover-private"><span className="status-dot" />{t.privateNote}</div></div>
+          <div className="cover-copy"><span className="eyebrow">{t.coverEyebrow}</span><h1>{t.coverTitle}</h1><p>{t.coverBody}</p><div className="cover-actions"><button className="primary-button" onClick={() => planInputRef.current?.click()}>＋ {t.open}</button><button className="cover-secondary" onClick={() => rasterInputRef.current?.click()}>▧ {t.vectorize}</button></div><small className="cover-formats">{t.coverFormats}</small><div className="cover-private"><span className="status-dot" />{t.privateNote}</div></div><section className="recent-projects" aria-label={t.projects}><div className="recent-projects-heading"><strong>{t.projects}</strong><span>{recentProjects.length}/8</span></div>{recentProjects.length ? <div className="recent-project-list">{recentProjects.map((project) => <article key={project.id} className="recent-project"><div><strong title={project.name}>{project.name.replace(/\.[^.]+$/, "")}</strong><small>{project.format} · {project.entities} {t.entities} · {project.layers} {t.layers.toLowerCase()}</small></div><button onClick={() => deleteRecentProject(project.id)} aria-label={`${t.deleteProject}: ${project.name}`} title={t.deleteProject}>×</button></article>)}</div> : <p className="recent-project-empty">{t.noProjects}</p>}</section>
         </section> : <>
           <section className="canvas-area" aria-label={t.drawing}>
             <div className="canvas-toolbar"><div className="crumb"><span>{t.drawing}</span><b>/</b><strong>{drawing.name.replace(/\.[^.]+$/, "")}</strong></div><div className="view-controls"><button onClick={() => setZoom((value) => Math.max(0.65, value / 1.2))} aria-label="Zoom out">−</button><output>{Math.round(zoom * 100)}%</output><button onClick={() => setZoom((value) => Math.min(10, value * 1.2))} aria-label="Zoom in">＋</button><button onClick={resetView} aria-label={t.fit}>⌗</button></div></div>
@@ -1181,7 +1205,7 @@ export default function ArqueoCadMobile() {
         </>}
       </section>
 
-      <footer className="license-footer"><span>{t.footerText}</span><strong><a href="http://josejaviermartinez.com/digital-laboratory/" target="_blank" rel="noreferrer">Laboratorio Digital</a></strong></footer>
+      <footer className="license-footer"><span>{t.footerText}</span><strong><a href="http://josejaviermartinez.com/digital-laboratory/" target="_blank" rel="noreferrer">Laboratorio Digital</a></strong><small className="app-version-footer">{APP_VERSION}</small></footer>
 
       <nav className="mobile-nav" aria-label={t.mobileTools}><button onClick={() => planInputRef.current?.click()}><span>＋</span>{t.openShort}</button><button onClick={() => rasterInputRef.current?.click()}><span>▧</span>{t.vectorizeShort}</button><button disabled={!drawing} className={activePanel === "layers" ? "active" : ""} onClick={() => setActivePanel(activePanel === "layers" ? null : "layers")}><span>▤</span>{t.layers}</button><button disabled={!drawing} className={measureMode ? "measure-fab active" : "measure-fab"} onClick={() => { setMeasureMode((value) => !value); setActivePanel(null); }}><span>⌁</span>{t.measure}</button><button disabled={!drawing} onClick={() => setActivePanel(activePanel === "warnings" ? null : "warnings")}><span>!</span>{t.warnings}</button><button disabled={!drawing} onClick={() => setExportOpen(true)}><span>⇩</span>{t.export}</button></nav>
 
