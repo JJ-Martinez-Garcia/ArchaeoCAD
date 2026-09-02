@@ -549,7 +549,7 @@ export default function ArqueoCadMobile() {
   const t = translations[lang];
 
   useEffect(() => {
-    if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => undefined);
+    if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js", { updateViaCache: "none" }).then((registration) => registration.update()).catch(() => undefined);
   }, []);
 
   useEffect(() => {

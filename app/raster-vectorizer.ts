@@ -495,6 +495,37 @@ function ocrPrimitives(texts: OcrText[], width: number, height: number, scale: n
   }));
 }
 
+type RasterSource = CanvasImageSource & { close?: () => void };
+
+/**
+ * Safari/iOS WebKit and several Android WebViews do not expose
+ * createImageBitmap(File). Falling back to an HTMLImageElement keeps the
+ * vectorizer usable in those browsers instead of surfacing a generic error.
+ */
+async function decodeRaster(file: File): Promise<{ source: RasterSource; width: number; height: number; revoke?: () => void }> {
+  if (typeof createImageBitmap === "function") {
+    try {
+      const bitmap = await createImageBitmap(file);
+      return { source: bitmap, width: bitmap.width, height: bitmap.height };
+    } catch {
+      // Continue with the object-URL decoder below.
+    }
+  }
+  const url = URL.createObjectURL(file);
+  try {
+    const image = await new Promise<HTMLImageElement>((resolve, reject) => {
+      const element = new Image();
+      element.onload = () => resolve(element);
+      element.onerror = () => reject(new Error("Image decode failed"));
+      element.src = url;
+    });
+    return { source: image, width: image.naturalWidth || image.width, height: image.naturalHeight || image.height, revoke: () => URL.revokeObjectURL(url) };
+  } catch (error) {
+    URL.revokeObjectURL(url);
+    throw error;
+  }
+}
+
 async function vectorizeWithVTracer(binary: Uint8Array, width: number, height: number, file: File, options: RasterOptions, detectedScalePixels: number | null, ocrTexts: OcrText[]): Promise<Drawing | null> {
   const serial = vtracerSerial += 1;
   const canvas = document.createElement("canvas");
@@ -537,9 +568,11 @@ async function vectorizeWithVTracer(binary: Uint8Array, width: number, height: n
     }));
     converter.init();
     await new Promise<void>((resolve, reject) => {
+      const deadline = performance.now() + 20000;
       const step = () => {
         try {
           if (converter?.tick()) resolve();
+          else if (performance.now() >= deadline) reject(new Error("VTracer timeout"));
           else raf()(step);
         } catch (error) {
           reject(error);
@@ -593,11 +626,12 @@ async function vectorizeWithVTracer(binary: Uint8Array, width: number, height: n
 }
 
 export async function vectorizeRaster(file: File, options: RasterOptions): Promise<Drawing> {
-  const bitmap = await createImageBitmap(file);
+  const decoded = await decodeRaster(file);
+  const bitmap = decoded.source;
   const detailLimit = options.detail === 3 ? 1700 : options.detail === 2 ? 1400 : 1050;
-  const reduction = Math.min(1, detailLimit / Math.max(bitmap.width, bitmap.height));
-  const width = Math.max(1, Math.round(bitmap.width * reduction));
-  const height = Math.max(1, Math.round(bitmap.height * reduction));
+  const reduction = Math.min(1, detailLimit / Math.max(decoded.width, decoded.height));
+  const width = Math.max(1, Math.round(decoded.width * reduction));
+  const height = Math.max(1, Math.round(decoded.height * reduction));
   const canvas = document.createElement("canvas");
   canvas.width = width;
   canvas.height = height;
@@ -606,7 +640,8 @@ export async function vectorizeRaster(file: File, options: RasterOptions): Promi
   context.fillStyle = "white";
   context.fillRect(0, 0, width, height);
   context.drawImage(bitmap, 0, 0, width, height);
-  bitmap.close();
+  bitmap.close?.();
+  decoded.revoke?.();
   const initialGray = normaliseGray(context.getImageData(0, 0, width, height).data);
   deskewCanvas(canvas, estimateSkewAngle(initialGray, width, height));
   const gray = normaliseGray(context.getImageData(0, 0, width, height).data);
