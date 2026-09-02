@@ -395,9 +395,8 @@ function classify(features: PathFeature[], width: number, height: number) {
       feature.layer = "06_SIMBOLOS";
     } else if (textLike) {
       feature.layer = "08_TEXTOS_EDITABLES";
-    } else if (feature.length > diagonal * 0.13 && feature.straightness > 0.92 && horizontalOrVertical) {
-      feature.layer = "04_EJES_SECCIONES";
-      feature.dashed = true;
+    // A long solid wall is not an axis. Axes are promoted below only when
+    // several short, collinear strokes form a discontinuous span.
     } else if ((hatchBuckets.get(hatchKey) ?? 0) >= 5 && feature.straightness > 0.9 && feature.meanTurn < 0.35) {
       feature.layer = "05_TRAMAS";
     } else if (feature.length > diagonal * 0.15 && feature.straightness < 0.78 && feature.meanTurn < 0.55) {
@@ -451,6 +450,42 @@ function classify(features: PathFeature[], width: number, height: number) {
     });
   });
   return features.filter((feature) => feature.confidence < 0.5).length;
+}
+
+/**
+ * Printed plans and exported diagrams often contain a one-pixel black frame.
+ * If that frame enters the binary mask it connects otherwise independent
+ * objects into one giant path (and creates the long red lines seen in the
+ * viewer). Remove only edges that are genuinely ink-dense; normal drawings
+ * touching an edge are left alone.
+ */
+function stripImageFrame(binary: Uint8Array, width: number, height: number) {
+  const cleaned = binary.slice();
+  const band = Math.max(2, Math.round(Math.min(width, height) * 0.006));
+  const edgeDensity = (edge: "top" | "bottom" | "left" | "right") => {
+    let ink = 0;
+    let total = edge === "top" || edge === "bottom" ? width : height;
+    const samples = Math.min(4, band);
+    for (let offset = 0; offset < samples; offset += 1) {
+      const row = edge === "top" ? offset : edge === "bottom" ? height - 1 - offset : -1;
+      const col = edge === "left" ? offset : edge === "right" ? width - 1 - offset : -1;
+      for (let index = 0; index < total; index += 1) {
+        const pixel = row >= 0 ? row * width + index : index * width + col;
+        ink += binary[pixel];
+      }
+    }
+    return ink / Math.max(1, total * samples);
+  };
+  const clear = (edge: "top" | "bottom" | "left" | "right") => {
+    if (edge === "top") for (let y = 0; y < band; y += 1) for (let x = 0; x < width; x += 1) cleaned[y * width + x] = 0;
+    if (edge === "bottom") for (let y = Math.max(0, height - band); y < height; y += 1) for (let x = 0; x < width; x += 1) cleaned[y * width + x] = 0;
+    if (edge === "left") for (let x = 0; x < band; x += 1) for (let y = 0; y < height; y += 1) cleaned[y * width + x] = 0;
+    if (edge === "right") for (let x = Math.max(0, width - band); x < width; x += 1) for (let y = 0; y < height; y += 1) cleaned[y * width + x] = 0;
+  };
+  (["top", "bottom", "left", "right"] as const).forEach((edge) => {
+    if (edgeDensity(edge) >= 0.42) clear(edge);
+  });
+  return cleaned;
 }
 
 function detectScaleBar(binary: Uint8Array, width: number, height: number) {
@@ -654,7 +689,10 @@ export async function vectorizeRaster(file: File, options: RasterOptions): Promi
   const initialGray = normaliseGray(context.getImageData(0, 0, width, height).data);
   deskewCanvas(canvas, estimateSkewAngle(initialGray, width, height));
   const gray = normaliseGray(context.getImageData(0, 0, width, height).data);
-  const binary = adaptiveBinary(gray, width, height, options.threshold);
+  const rawBinary = adaptiveBinary(gray, width, height, options.threshold);
+  // Keep the frame out of the connected-component graph so A/B/C (or rooms
+  // in an archaeological plan) remain separate editable paths.
+  const binary = stripImageFrame(rawBinary, width, height);
   const detectedScalePixels = options.scaleBarLength ? detectScaleBar(binary, width, height) : null;
   const ocrTexts = options.ocr ? await recognizeRasterText(canvas) : [];
   const vtracerDrawing = await vectorizeWithVTracer(binary, width, height, file, options, detectedScalePixels, ocrTexts);
