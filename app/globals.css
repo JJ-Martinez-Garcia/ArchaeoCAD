@@ -1395,6 +1395,44 @@ input:checked + .custom-check {
   letter-spacing: 0.1em;
 }
 
+.help-credits {
+  margin-top: 12px;
+  padding: 15px 16px;
+  background: #ebe5d8;
+  border: 1px solid #d8cdb9;
+}
+
+.help-credits > strong {
+  display: block;
+  margin-bottom: 6px;
+  color: #66512b;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.help-credits p {
+  margin: 0;
+  color: #77756d;
+  font-size: 10px;
+  line-height: 1.6;
+}
+
+.help-credits nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  margin-top: 11px;
+}
+
+.help-credits nav a {
+  color: #966d20;
+  font-size: 10px;
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
 .help-modal .modal-actions {
   justify-content: flex-end;
   margin-top: 18px;
