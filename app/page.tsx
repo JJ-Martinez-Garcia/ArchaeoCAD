@@ -23,7 +23,7 @@ import {
 } from "./cad-core";
 import { RasterOptions, vectorizeRaster } from "./raster-vectorizer";
 
-const APP_VERSION = "v18";
+const APP_VERSION = "v19";
 
 type Lang = "es" | "en" | "ar" | "fr" | "de" | "it" | "pt" | "zh" | "hi" | "ru" | "ja";
 type InstallPromptEvent = Event & {
@@ -154,7 +154,7 @@ const copy = {
     helpTipsBody: "La vectorización es semiautomática: revisa trazos, textos y capas antes de usar el resultado como documentación definitiva. Para conservar bloques y estructuras CAD originales, trabaja con el DXF de origen.",
     helpCreditsTitle: "Créditos, código fuente y licencias",
     helpCreditsBody: "ArqueoCAD Mobile parte del proyecto original de José Javier Martínez publicado en GitHub y se distribuye bajo GPL-3.0. La interfaz usa React, Vinext y Vite (MIT). Para futuras mejoras de vectorización se han revisado AutoTrace (GPL-2.0/LGPL-2.1), VTracer (MIT) y Trazor (MIT). Consulta siempre la licencia completa antes de incorporar código.",
-    footerText: "Este es un software gratuito y de libre distribución creado por José Javier Martínez.",
+    footerText: "Este es un software gratuito y de libre distribución creado por José Javier Martínez para el ",
     about: "Acerca de",
     aboutTitle: "Acerca de ArqueoCAD",
     aboutBodyPrefix: "Esta aplicación forma parte del",
@@ -286,7 +286,7 @@ const copy = {
     helpTipsBody: "Vectorization is semi-automatic: review strokes, text and layers before using the result as final documentation. To preserve original CAD blocks and structures, work from the source DXF.",
     helpCreditsTitle: "Credits, source code and licences",
     helpCreditsBody: "ArqueoCAD Mobile builds on José Javier Martínez’s original project published on GitHub and is distributed under GPL-3.0. The interface uses React, Vinext and Vite (MIT). For future vectorization improvements we reviewed AutoTrace (GPL-2.0/LGPL-2.1), VTracer (MIT) and Trazor (MIT). Always read the complete licence before incorporating code.",
-    footerText: "This is free, freely distributable software created by José Javier Martínez.",
+    footerText: "This is free, freely distributable software created by José Javier Martínez for the ",
     about: "About",
     aboutTitle: "About ArqueoCAD",
     aboutBodyPrefix: "This application is part of",
@@ -871,7 +871,7 @@ export default function ArqueoCadMobile() {
         </>}
       </section>
 
-      <footer className="license-footer"><span>{t.footerText}</span><a href="http://www.josejaviermartinez.com" target="_blank" rel="noreferrer">www.josejaviermartinez.com</a><a href="https://laboratorio-digital.jjmartinezgarcia.chatgpt.site/" target="_blank" rel="noreferrer">Laboratorio Digital</a><button className="about-link" onClick={() => setAboutOpen(true)}>{t.about}</button></footer>
+      <footer className="license-footer"><span>{t.footerText}</span><strong><a href="http://josejaviermartinez.com/digital-laboratory/" target="_blank" rel="noreferrer">Laboratorio Digital</a></strong><button className="about-link" onClick={() => setAboutOpen(true)}>{t.about}</button></footer>
 
       <nav className="mobile-nav" aria-label={t.mobileTools}><button onClick={() => planInputRef.current?.click()}><span>＋</span>{t.openShort}</button><button onClick={() => rasterInputRef.current?.click()}><span>▧</span>{t.vectorizeShort}</button><button disabled={!drawing} className={activePanel === "layers" ? "active" : ""} onClick={() => setActivePanel(activePanel === "layers" ? null : "layers")}><span>▤</span>{t.layers}</button><button disabled={!drawing} className={measureMode ? "measure-fab active" : "measure-fab"} onClick={() => { setMeasureMode((value) => !value); setActivePanel(null); }}><span>⌁</span>{t.measure}</button><button disabled={!drawing} onClick={() => setActivePanel(activePanel === "warnings" ? null : "warnings")}><span>!</span>{t.warnings}</button><button disabled={!drawing} onClick={() => setExportOpen(true)}><span>⇩</span>{t.export}</button></nav>
 
