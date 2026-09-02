@@ -353,7 +353,9 @@ function parsePoints(value: string) {
 // made the result visibly angular and lost the original curvature.
 function parsePathData(value: string) {
   const tokens = value.match(/[a-zA-Z]|[-+]?(?:\d*\.\d+|\d+\.?)(?:[eE][-+]?\d+)?/g) ?? [];
-  const points: Point[] = [];
+  // VTracer may pack multiple independent drawings into one SVG path. Keep
+  // each M/m subpath separate so no artificial segment joins them together.
+  const subpaths: Point[][] = [[]];
   let index = 0;
   let command = "M";
   let current = { x: 0, y: 0 };
@@ -362,7 +364,7 @@ function parsePathData(value: string) {
   const isCommand = (token: string | undefined) => Boolean(token && /^[a-zA-Z]$/.test(token));
   const number = () => Number(tokens[index++]);
   const has = (count: number) => index + count <= tokens.length && !isCommand(tokens[index]);
-  const add = (point: Point) => { points.push({ x: point.x, y: -point.y }); current = point; };
+  const add = (point: Point) => { subpaths[subpaths.length - 1].push({ x: point.x, y: -point.y }); current = point; };
   const sampleCubic = (p0: Point, p1: Point, p2: Point, p3: Point) => {
     for (let step = 1; step <= 10; step += 1) {
       const t = step / 10;
@@ -383,6 +385,7 @@ function parsePathData(value: string) {
     const op = command.toUpperCase();
     if (op === "Z") { add(start); lastControl = null; command = relative ? "m" : "M"; continue; }
     if (op === "M" && has(2)) {
+      if (subpaths[subpaths.length - 1].length) subpaths.push([]);
       const next = { x: number() + (relative ? current.x : 0), y: number() + (relative ? current.y : 0) };
       add(next); start = next; lastControl = null; command = relative ? "l" : "L"; continue;
     }
@@ -418,7 +421,7 @@ function parsePathData(value: string) {
     // Malformed path or unsupported command: advance to avoid an infinite loop.
     index += 1;
   }
-  return points;
+  return subpaths.filter((points) => points.length >= 2);
 }
 
 export function parseSvg(text: string, name: string): Drawing {
@@ -434,7 +437,7 @@ export function parseSvg(text: string, name: string): Drawing {
     const style = element.getAttribute("style") ?? "";
     const color = element.getAttribute("stroke") ?? style.match(/stroke:\s*([^;]+)/)?.[1] ?? "#d7d2c7";
     if (!layerMap.has(layerName)) layerMap.set(layerName, { name: layerName, color, visible: true, selected: true, count: 0 });
-    layerMap.get(layerName)!.count += 1;
+    if (element.tagName.toLowerCase() !== "path") layerMap.get(layerName)!.count += 1;
     const common = { id: `svg-${index}`, layer: layerName, color };
     const tag = element.tagName.toLowerCase();
     if (tag === "line") {
@@ -452,8 +455,11 @@ export function parseSvg(text: string, name: string): Drawing {
     } else if (tag === "text") {
       primitives.push({ ...common, type: "text", center: { x: Number(element.getAttribute("x")) || 0, y: -(Number(element.getAttribute("y")) || 0) }, text: element.textContent ?? "", height: Number(element.getAttribute("font-size")) || 12 });
     } else if (tag === "path") {
-      const points = parsePathData(element.getAttribute("d") ?? "");
-      if (points.length > 1) primitives.push({ ...common, type: "polyline", points, closed: /z\s*$/i.test(element.getAttribute("d") ?? "") });
+      const subpaths = parsePathData(element.getAttribute("d") ?? "");
+      subpaths.forEach((points, subIndex) => {
+        layerMap.get(layerName)!.count += 1;
+        primitives.push({ ...common, id: `${common.id}-${subIndex}`, type: "polyline", points, closed: points.length > 2 && points[0].x === points[points.length - 1].x && points[0].y === points[points.length - 1].y });
+      });
     }
   });
   const warnings = root.querySelector("g[inkscape\\:groupmode='layer']") ? [] : ["El SVG no declara capas de Inkscape; los grupos se han usado como capas de trabajo."];
