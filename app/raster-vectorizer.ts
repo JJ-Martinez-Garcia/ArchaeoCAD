@@ -138,7 +138,9 @@ function estimateSkewAngle(gray: Uint8Array, width: number, height: number) {
       bestAngle = angle;
     }
   }
-  return Math.abs(bestAngle) >= 0.012 ? bestAngle : 0;
+  // Avoid rotating nearly level scans: resampling a high-resolution photo can
+  // create anti-aliased speckle that makes the WASM tracer needlessly slow.
+  return Math.abs(bestAngle) >= 0.03 ? bestAngle : 0;
 }
 
 function deskewCanvas(canvas: HTMLCanvasElement, angle: number) {

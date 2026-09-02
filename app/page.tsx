@@ -23,7 +23,7 @@ import {
 } from "./cad-core";
 import { RasterOptions, vectorizeRaster } from "./raster-vectorizer";
 
-const APP_VERSION = "v16";
+const APP_VERSION = "v17";
 
 type Lang = "es" | "en" | "ar" | "fr" | "de" | "it" | "pt" | "zh" | "hi" | "ru" | "ja";
 type InstallPromptEvent = Event & {
@@ -514,7 +514,7 @@ export default function ArqueoCadMobile() {
   const [rasterJob, setRasterJob] = useState<RasterJob | null>(null);
   const [threshold, setThreshold] = useState(165);
   const [simplify, setSimplify] = useState(0.6);
-  const [detail, setDetail] = useState<RasterOptions["detail"]>(3);
+  const [detail, setDetail] = useState<RasterOptions["detail"]>(2);
   const [classifyLines, setClassifyLines] = useState(true);
   const [ocrEnabled, setOcrEnabled] = useState(true);
   const [detectScale, setDetectScale] = useState(true);
@@ -645,7 +645,7 @@ export default function ArqueoCadMobile() {
     setRasterJob({ file, url: URL.createObjectURL(file) });
     setThreshold(165);
     setSimplify(0.6);
-    setDetail(3);
+    setDetail(2);
     setClassifyLines(true);
     setOcrEnabled(true);
     setDetectScale(true);
