@@ -11,6 +11,7 @@ import {
 } from "react";
 import {
   Drawing,
+  Primitive,
   Point,
   getBounds,
   makeZip,
@@ -23,7 +24,101 @@ import {
 } from "./cad-core";
 import { RasterOptions, vectorizeRaster } from "./raster-vectorizer";
 
-const APP_VERSION = "v25";
+const APP_VERSION = "v26";
+
+type VectorCategory = "draw" | "modify" | "geometry" | "precision" | "organize";
+type VectorTool = "select" | "point" | "line" | "polyline" | "polygon" | "rectangle" | "circle" | "arc" | "move" | "copy" | "rotate" | "scale" | "mirror" | "offset" | "vertices" | "trim" | "extend" | "split" | "join" | "explode" | "snap" | "ortho" | "grid" | "coordinates" | "layers" | "properties" | "order";
+
+const vectorToolsCopy = {
+  es: {
+    title: "Edición vectorial",
+    draw: "Dibujo",
+    modify: "Modificar",
+    geometry: "Editar geometría",
+    precision: "Precisión",
+    organize: "Organización",
+    select: "Seleccionar",
+    point: "Punto",
+    line: "Línea",
+    polyline: "Polilínea",
+    polygon: "Polígono",
+    rectangle: "Rectángulo",
+    circle: "Círculo",
+    arc: "Arco",
+    move: "Mover",
+    copy: "Copiar",
+    rotate: "Rotar",
+    scale: "Escalar",
+    mirror: "Espejo",
+    offset: "Offset",
+    vertices: "Vértices",
+    trim: "Recortar",
+    extend: "Extender",
+    split: "Partir",
+    join: "Unir",
+    explode: "Explotar",
+    snap: "Snap",
+    ortho: "Orto",
+    grid: "Rejilla",
+    coordinates: "Coordenadas",
+    properties: "Propiedades",
+    order: "Orden de dibujo",
+    hint: "Selecciona una entidad y elige una herramienta",
+    selected: "seleccionadas",
+    ready: "Herramienta activa",
+  },
+  en: {
+    title: "Vector editing",
+    draw: "Draw",
+    modify: "Modify",
+    geometry: "Edit geometry",
+    precision: "Precision",
+    organize: "Organisation",
+    select: "Select",
+    point: "Point",
+    line: "Line",
+    polyline: "Polyline",
+    polygon: "Polygon",
+    rectangle: "Rectangle",
+    circle: "Circle",
+    arc: "Arc",
+    move: "Move",
+    copy: "Copy",
+    rotate: "Rotate",
+    scale: "Scale",
+    mirror: "Mirror",
+    offset: "Offset",
+    vertices: "Vertices",
+    trim: "Trim",
+    extend: "Extend",
+    split: "Split",
+    join: "Join",
+    explode: "Explode",
+    snap: "Snap",
+    ortho: "Ortho",
+    grid: "Grid",
+    coordinates: "Coordinates",
+    properties: "Properties",
+    order: "Draw order",
+    hint: "Select an entity and choose a tool",
+    selected: "selected",
+    ready: "Active tool",
+  },
+} as const;
+
+const vectorCategoryTools: Record<VectorCategory, VectorTool[]> = {
+  draw: ["select", "point", "line", "polyline", "polygon", "rectangle", "circle", "arc"],
+  modify: ["move", "copy", "rotate", "scale", "mirror", "offset"],
+  geometry: ["vertices", "trim", "extend", "split", "join", "explode"],
+  precision: ["snap", "ortho", "grid", "coordinates"],
+  organize: ["layers", "properties", "order"],
+};
+
+const vectorToolIcons: Record<VectorTool, string> = {
+  select: "⌁", point: "·", line: "╱", polyline: "⌁", polygon: "⬠", rectangle: "□", circle: "○", arc: "⌒",
+  move: "✥", copy: "＋", rotate: "↻", scale: "↗", mirror: "⇋", offset: "▱", vertices: "◇", trim: "⌫", extend: "↔", split: "┆", join: "∪", explode: "✣",
+  snap: "⊙", ortho: "⊥", grid: "▦", coordinates: "⌖", layers: "▤", properties: "☷", order: "⇅",
+};
 
 type Lang = "es" | "en" | "ar" | "fr" | "de" | "it" | "pt" | "zh" | "hi" | "ru" | "ja";
 type InstallPromptEvent = Event & {
@@ -503,6 +598,14 @@ export default function ArqueoCadMobile() {
   const [search, setSearch] = useState("");
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
+  const [vectorCategory, setVectorCategory] = useState<VectorCategory>("draw");
+  const [vectorTool, setVectorTool] = useState<VectorTool>("select");
+  const [selectedEntityIds, setSelectedEntityIds] = useState<string[]>([]);
+  const [draftPoints, setDraftPoints] = useState<Point[]>([]);
+  const [snapEnabled, setSnapEnabled] = useState(true);
+  const [orthoEnabled, setOrthoEnabled] = useState(false);
+  const [gridEnabled, setGridEnabled] = useState(true);
+  const [cursorPoint, setCursorPoint] = useState<Point | null>(null);
   const [measureMode, setMeasureMode] = useState(false);
   const [measurePoints, setMeasurePoints] = useState<Point[]>([]);
   const [exportOpen, setExportOpen] = useState(false);
@@ -531,7 +634,9 @@ export default function ArqueoCadMobile() {
   const rasterInputRef = useRef<HTMLInputElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
   const dragRef = useRef<{ x: number; y: number; panX: number; panY: number; moved: boolean } | null>(null);
+  const vertexDragRef = useRef<{ id: string; index: number } | null>(null);
   const t: Copy = lang === "es" ? copy.es : lang === "en" ? copy.en : lang === "ar" ? copy.ar : { ...copy.es, ...(languageOverrides[lang] ?? {}) };
+  const vt = lang === "en" ? vectorToolsCopy.en : vectorToolsCopy.es;
 
   useEffect(() => {
     if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js", { updateViaCache: "none" }).then((registration) => registration.update()).catch(() => undefined);
@@ -632,6 +737,9 @@ export default function ArqueoCadMobile() {
 
   function loadDrawing(next: Drawing) {
     setDrawing(next);
+    setSelectedEntityIds([]);
+    setDraftPoints([]);
+    setVectorTool("select");
     setMeasurePoints([]);
     setMeasureMode(false);
     resetView();
@@ -739,6 +847,173 @@ export default function ArqueoCadMobile() {
     setDrawing((current) => current ? ({ ...current, layers: current.layers.map((layer) => ({ ...layer, selected: layer.auxiliary ? false : selected, visible: layer.auxiliary ? layer.visible : selected })) }) : current);
   }
 
+  function newEntityId(prefix: string) {
+    return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+  }
+
+  function entityPoints(entity: Primitive): Point[] {
+    if (entity.points?.length) return entity.points;
+    if (entity.center) {
+      const radius = entity.radius ?? 1;
+      return [{ x: entity.center.x - radius, y: entity.center.y }, { x: entity.center.x + radius, y: entity.center.y }];
+    }
+    return [];
+  }
+
+  function transformSelected(transform: (entity: Primitive) => Primitive, message: string) {
+    if (!selectedEntityIds.length) {
+      setToast(`${vt.hint}.`);
+      return;
+    }
+    setDrawing((current) => current ? { ...current, primitives: current.primitives.map((entity) => selectedEntityIds.includes(entity.id) ? transform(entity) : entity) } : current);
+    setToast(message);
+  }
+
+  function selectedCenter(entity: Primitive) {
+    const points = entityPoints(entity);
+    if (!points.length) return entity.center ?? { x: 0, y: 0 };
+    return { x: points.reduce((sum, point) => sum + point.x, 0) / points.length, y: points.reduce((sum, point) => sum + point.y, 0) / points.length };
+  }
+
+  function applyVectorTool(tool: VectorTool) {
+    if (tool === "snap") { setSnapEnabled((value) => !value); return; }
+    if (tool === "ortho") { setOrthoEnabled((value) => !value); return; }
+    if (tool === "grid") { setGridEnabled((value) => !value); return; }
+    if (tool === "layers") { setActivePanel("layers"); return; }
+    if (tool === "properties") { setActivePanel("warnings"); return; }
+    if (tool === "order") {
+      if (!selectedEntityIds.length) { setToast(`${vt.hint}.`); return; }
+      setDrawing((current) => {
+        if (!current) return current;
+        const selected = current.primitives.filter((entity) => selectedEntityIds.includes(entity.id));
+        const rest = current.primitives.filter((entity) => !selectedEntityIds.includes(entity.id));
+        return { ...current, primitives: [...rest, ...selected] };
+      });
+      setToast(`${vt.order}: ${vt.ready.toLowerCase()}`);
+      return;
+    }
+    if (tool === "move") { transformSelected((entity) => ({ ...entity, points: entity.points?.map((point) => ({ x: point.x + 1, y: point.y + 1 })), center: entity.center ? { x: entity.center.x + 1, y: entity.center.y + 1 } : undefined }), `${vt.move}: +1, +1`); return; }
+    if (tool === "copy") {
+      if (!selectedEntityIds.length) { setToast(`${vt.hint}.`); return; }
+      setDrawing((current) => {
+        if (!current) return current;
+        const copies = current.primitives.filter((entity) => selectedEntityIds.includes(entity.id)).map((entity) => ({ ...entity, id: newEntityId("copy"), points: entity.points?.map((point) => ({ x: point.x + 2, y: point.y + 2 })), center: entity.center ? { x: entity.center.x + 2, y: entity.center.y + 2 } : undefined }));
+        return { ...current, primitives: [...current.primitives, ...copies] };
+      });
+      setToast(vt.copy);
+      return;
+    }
+    if (tool === "rotate" || tool === "scale" || tool === "mirror") {
+      transformSelected((entity) => {
+        const pivot = selectedCenter(entity);
+        const angle = tool === "rotate" ? Math.PI / 2 : 0;
+        const factor = tool === "scale" ? 1.15 : 1;
+        const mirror = tool === "mirror";
+        const mapPoint = (point: Point) => {
+          const x = (point.x - pivot.x) * (mirror ? -factor : factor);
+          const y = (point.y - pivot.y) * factor;
+          return { x: pivot.x + x * Math.cos(angle) - y * Math.sin(angle), y: pivot.y + x * Math.sin(angle) + y * Math.cos(angle) };
+        };
+        return { ...entity, points: entity.points?.map(mapPoint), center: entity.center ? mapPoint(entity.center) : undefined, rotation: entity.rotation !== undefined && tool === "rotate" ? entity.rotation + 90 : entity.rotation, radius: entity.radius ? entity.radius * factor : entity.radius };
+      }, vt[tool]);
+      return;
+    }
+    if (tool === "offset") { transformSelected((entity) => ({ ...entity, points: entity.points?.map((point) => ({ x: point.x + 0.5, y: point.y - 0.5 })), center: entity.center ? { x: entity.center.x + 0.5, y: entity.center.y - 0.5 } : undefined }), `${vt.offset}: 0.5`); return; }
+    if (tool === "explode") {
+      if (!selectedEntityIds.length) { setToast(`${vt.hint}.`); return; }
+      setDrawing((current) => {
+        if (!current) return current;
+        const next: Primitive[] = [];
+        current.primitives.forEach((entity) => {
+          if (!selectedEntityIds.includes(entity.id) || !entity.points || entity.points.length < 2) { next.push(entity); return; }
+          for (let index = 1; index < entity.points.length; index += 1) next.push({ ...entity, id: newEntityId("segment"), points: [entity.points[index - 1], entity.points[index]], closed: false });
+        });
+        return { ...current, primitives: next };
+      });
+      setSelectedEntityIds([]);
+      setToast(vt.explode);
+      return;
+    }
+    if (tool === "split") {
+      if (!selectedEntityIds.length) { setToast(`${vt.hint}.`); return; }
+      setDrawing((current) => {
+        if (!current) return current;
+        const next: Primitive[] = [];
+        current.primitives.forEach((entity) => {
+          if (!selectedEntityIds.includes(entity.id) || !entity.points || entity.points.length < 4) { next.push(entity); return; }
+          const middle = Math.floor(entity.points.length / 2);
+          next.push({ ...entity, id: newEntityId("split-a"), points: entity.points.slice(0, middle + 1), closed: false }, { ...entity, id: newEntityId("split-b"), points: entity.points.slice(middle), closed: false });
+        });
+        return { ...current, primitives: next };
+      });
+      setSelectedEntityIds([]);
+      setToast(vt.split);
+      return;
+    }
+    if (tool === "join") {
+      if (selectedEntityIds.length < 2) { setToast(`${vt.join}: ${vt.hint.toLowerCase()}`); return; }
+      setDrawing((current) => {
+        if (!current) return current;
+        const selected = current.primitives.filter((entity) => selectedEntityIds.includes(entity.id) && entity.type === "polyline" && entity.points?.length);
+        if (selected.length < 2) return current;
+        const first = selected[0];
+        const points = selected.slice(1).reduce((joined, entity) => {
+          const next = entity.points ?? [];
+          if (!next.length) return joined;
+          const end = joined[joined.length - 1];
+          const start = next[0];
+          const reverse = Math.hypot(end.x - next[next.length - 1].x, end.y - next[next.length - 1].y) < Math.hypot(end.x - start.x, end.y - start.y);
+          const ordered = reverse ? [...next].reverse() : next;
+          return [...joined, ...ordered.slice(Math.hypot(end.x - ordered[0].x, end.y - ordered[0].y) < 0.001 ? 1 : 0)];
+        }, [...(first.points ?? [])]);
+        const joined = { ...first, id: newEntityId("joined"), points };
+        return { ...current, primitives: [...current.primitives.filter((entity) => !selectedEntityIds.includes(entity.id)), joined] };
+      });
+      setSelectedEntityIds([]);
+      setToast(vt.join);
+      return;
+    }
+    if (["trim", "extend", "vertices"].includes(tool)) {
+      setToast(`${vt[tool]}: ${selectedEntityIds.length ? vt.ready.toLowerCase() : vt.hint.toLowerCase()}`);
+      return;
+    }
+    setVectorTool(tool);
+    setDraftPoints([]);
+    setToast(`${vt.ready}: ${vt[tool]}`);
+  }
+
+  function snapPoint(point: Point) {
+    let next = point;
+    if (snapEnabled) next = { x: Math.round(next.x), y: Math.round(next.y) };
+    if (orthoEnabled && draftPoints.length) {
+      const origin = draftPoints[0];
+      if (Math.abs(next.x - origin.x) >= Math.abs(next.y - origin.y)) next = { x: next.x, y: origin.y };
+      else next = { x: origin.x, y: next.y };
+    }
+    return next;
+  }
+
+  function addDrawPoint(point: Point) {
+    const nextPoint = snapPoint(point);
+    const points = [...draftPoints, nextPoint];
+    const layer = drawing?.layers.find((candidate) => !candidate.auxiliary)?.name ?? "01_ESTRUCTURAS";
+    const color = drawing?.layers.find((candidate) => candidate.name === layer)?.color;
+    const finish = (entity: Primitive) => {
+      setDrawing((current) => current ? { ...current, primitives: [...current.primitives, entity] } : current);
+      setSelectedEntityIds([entity.id]);
+      setDraftPoints([]);
+      setVectorTool("select");
+    };
+    const common = { id: newEntityId("draw"), layer, color, lineWeight: 0.18 };
+    if (vectorTool === "point") finish({ ...common, type: "point", center: nextPoint });
+    else if (vectorTool === "line" && points.length === 2) finish({ ...common, type: "polyline", points, lineType: "continuous" });
+    else if (vectorTool === "rectangle" && points.length === 2) { const [a, b] = points; finish({ ...common, type: "polyline", points: [{ x: a.x, y: a.y }, { x: b.x, y: a.y }, { x: b.x, y: b.y }, { x: a.x, y: b.y }, { x: a.x, y: a.y }], closed: true }); }
+    else if (vectorTool === "circle" && points.length === 2) finish({ ...common, type: "circle", center: points[0], radius: Math.hypot(points[1].x - points[0].x, points[1].y - points[0].y) });
+    else if (vectorTool === "arc" && points.length === 3) finish({ ...common, type: "polyline", points: [points[0], points[1], points[2]], closed: false });
+    else if ((vectorTool === "polyline" || vectorTool === "polygon") && points.length >= 3 && vectorTool === "polygon") finish({ ...common, type: "polyline", points: [...points, points[0]], closed: true });
+    else setDraftPoints(points);
+  }
+
   function eventPoint(event: ReactPointerEvent<SVGSVGElement>) {
     const svg = svgRef.current;
     if (!svg) return null;
@@ -757,12 +1032,20 @@ export default function ArqueoCadMobile() {
   }
 
   function onPointerMove(event: ReactPointerEvent<SVGSVGElement>) {
+    const point = eventPoint(event);
+    if (point) setCursorPoint(point);
+    if (vertexDragRef.current && point) {
+      const { id, index } = vertexDragRef.current;
+      const nextPoint = snapPoint(point);
+      setDrawing((current) => current ? { ...current, primitives: current.primitives.map((entity) => entity.id === id && entity.points ? { ...entity, points: entity.points.map((item, itemIndex) => itemIndex === index ? nextPoint : item) } : entity) } : current);
+      return;
+    }
     const drag = dragRef.current;
     if (!drag) return;
     const dx = event.clientX - drag.x;
     const dy = event.clientY - drag.y;
     if (Math.hypot(dx, dy) > 4) drag.moved = true;
-    if (drag.moved) {
+    if (drag.moved && vectorTool === "select" && !measureMode) {
       const rect = event.currentTarget.getBoundingClientRect();
       setPan({ x: drag.panX - dx * viewWidth / rect.width, y: drag.panY - dy * viewHeight / rect.height });
     }
@@ -773,8 +1056,18 @@ export default function ArqueoCadMobile() {
     if (drag && !drag.moved && measureMode) {
       const point = eventPoint(event);
       if (point) setMeasurePoints((current) => [...current, point]);
+    } else if (drag && !drag.moved && ["point", "line", "polyline", "polygon", "rectangle", "circle", "arc"].includes(vectorTool)) {
+      const point = eventPoint(event);
+      if (point) addDrawPoint(point);
     }
+    vertexDragRef.current = null;
     dragRef.current = null;
+  }
+
+  function onEntityPointerDown(event: ReactPointerEvent<SVGElement>, id: string) {
+    event.stopPropagation();
+    if (measureMode) return;
+    setSelectedEntityIds((current) => event.shiftKey ? (current.includes(id) ? current.filter((item) => item !== id) : [...current, id]) : [id]);
   }
 
   function onWheel(event: WheelEvent<SVGSVGElement>) {
@@ -846,20 +1139,24 @@ export default function ArqueoCadMobile() {
         </section> : <>
           <section className="canvas-area" aria-label={t.drawing}>
             <div className="canvas-toolbar"><div className="crumb"><span>{t.drawing}</span><b>/</b><strong>{drawing.name.replace(/\.[^.]+$/, "")}</strong></div><div className="view-controls"><button onClick={() => setZoom((value) => Math.max(0.65, value / 1.2))} aria-label="Zoom out">−</button><output>{Math.round(zoom * 100)}%</output><button onClick={() => setZoom((value) => Math.min(10, value * 1.2))} aria-label="Zoom in">＋</button><button onClick={resetView} aria-label={t.fit}>⌗</button></div></div>
-            <div className={`drawing-board ${measureMode ? "measuring" : ""}`}><div className="grid-overlay" /><svg ref={svgRef} className="cad-canvas" viewBox={`${viewX} ${viewY} ${viewWidth} ${viewHeight}`} preserveAspectRatio="xMidYMid meet" onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} onPointerCancel={() => { dragRef.current = null; }} onWheel={onWheel} role="img" aria-label={`${drawing.name}, ${drawing.layers.length} ${t.layers.toLowerCase()}`}>
+            <div className={`drawing-board ${measureMode ? "measuring" : ""}`}><div className="grid-overlay" style={{ opacity: gridEnabled ? 1 : 0 }} /><section className="vector-toolbox" aria-label={vt.title}><div className="vector-toolbox-heading"><strong>{vt.title}</strong><span>{selectedEntityIds.length} {vt.selected}</span></div><div className="vector-category-tabs">{(Object.keys(vectorCategoryTools) as VectorCategory[]).map((category) => <button key={category} className={vectorCategory === category ? "active" : ""} onClick={() => setVectorCategory(category)}>{vt[category]}</button>)}</div><div className="vector-tool-list">{vectorCategoryTools[vectorCategory].map((tool) => <button key={tool} className={`${vectorTool === tool ? "active" : ""} ${(tool === "snap" && snapEnabled) || (tool === "ortho" && orthoEnabled) || (tool === "grid" && gridEnabled) ? "toggled" : ""}`} onClick={() => applyVectorTool(tool)} title={vt[tool]}><span>{vectorToolIcons[tool]}</span><small>{vt[tool]}</small></button>)}</div>{draftPoints.length > 0 && <div className="vector-draft-hint">{draftPoints.length} puntos · doble clic para terminar polilínea</div>}</section><svg ref={svgRef} className="cad-canvas" viewBox={`${viewX} ${viewY} ${viewWidth} ${viewHeight}`} preserveAspectRatio="xMidYMid meet" onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} onDoubleClick={() => { if (vectorTool === "polyline" && draftPoints.length >= 2) { const layer = drawing.layers.find((candidate) => !candidate.auxiliary)?.name ?? "01_ESTRUCTURAS"; const entity: Primitive = { id: newEntityId("draw"), type: "polyline", layer, color: drawing.layers.find((candidate) => candidate.name === layer)?.color, points: draftPoints }; setDrawing((current) => current ? { ...current, primitives: [...current.primitives, entity] } : current); setSelectedEntityIds([entity.id]); setDraftPoints([]); setVectorTool("select"); } }} onPointerCancel={() => { vertexDragRef.current = null; dragRef.current = null; }} onWheel={onWheel} role="img" aria-label={`${drawing.name}, ${drawing.layers.length} ${t.layers.toLowerCase()}`}>
               {visiblePrimitives.map((entity) => {
                 const color = entity.color ?? drawing.layers.find((layer) => layer.name === entity.layer)?.color ?? "#ece8dd";
                 const dash = entity.lineType === "dashed" ? `${strokeWidth * 8} ${strokeWidth * 5}` : undefined;
-                if (entity.type === "polyline" && entity.points?.length) return <polyline key={entity.id} points={entity.points.map((point) => `${point.x},${sy(point.y)}`).join(" ")} fill="none" stroke={color} strokeWidth={strokeWidth} strokeDasharray={dash} strokeLinecap="round" strokeLinejoin="round" opacity="0.9" />;
-                if (entity.type === "circle" && entity.center) return <circle key={entity.id} cx={entity.center.x} cy={sy(entity.center.y)} r={entity.radius ?? 1} fill="none" stroke={color} strokeWidth={strokeWidth} strokeDasharray={dash} opacity="0.9" />;
-                if (entity.type === "point" && entity.center) return <circle key={entity.id} cx={entity.center.x} cy={sy(entity.center.y)} r={strokeWidth * 2.3} fill={color} />;
-                if (entity.type === "text" && entity.center) return <text key={entity.id} x={entity.center.x} y={sy(entity.center.y)} fill={color} fontSize={entity.height ?? 1} fontFamily="ui-monospace, monospace" transform={`rotate(${-(entity.rotation ?? 0)} ${entity.center.x} ${sy(entity.center.y)})`}>{entity.text}</text>;
+                const selected = selectedEntityIds.includes(entity.id);
+                const selectionProps = { onPointerDown: (event: ReactPointerEvent<SVGElement>) => onEntityPointerDown(event, entity.id), style: { cursor: "pointer" } };
+                if (entity.type === "polyline" && entity.points?.length) return <polyline key={entity.id} {...selectionProps} points={entity.points.map((point) => `${point.x},${sy(point.y)}`).join(" ")} fill={entity.closed ? "rgba(214,163,75,0.06)" : "none"} stroke={selected ? "#ffd166" : color} strokeWidth={selected ? strokeWidth * 2.3 : strokeWidth} strokeDasharray={dash} strokeLinecap="round" strokeLinejoin="round" opacity="0.9" />;
+                if (entity.type === "circle" && entity.center) return <circle key={entity.id} {...selectionProps} cx={entity.center.x} cy={sy(entity.center.y)} r={entity.radius ?? 1} fill="none" stroke={selected ? "#ffd166" : color} strokeWidth={selected ? strokeWidth * 2.3 : strokeWidth} strokeDasharray={dash} opacity="0.9" />;
+                if (entity.type === "point" && entity.center) return <circle key={entity.id} {...selectionProps} cx={entity.center.x} cy={sy(entity.center.y)} r={strokeWidth * 2.3} fill={selected ? "#ffd166" : color} />;
+                if (entity.type === "text" && entity.center) return <text key={entity.id} {...selectionProps} x={entity.center.x} y={sy(entity.center.y)} fill={selected ? "#ffd166" : color} fontSize={entity.height ?? 1} fontFamily="ui-monospace, monospace" transform={`rotate(${-(entity.rotation ?? 0)} ${entity.center.x} ${sy(entity.center.y)})`}>{entity.text}</text>;
                 return null;
               })}
+              {draftPoints.length > 0 && <polyline points={draftPoints.map((point) => `${point.x},${sy(point.y)}`).join(" ")} fill="none" stroke="#ffd166" strokeWidth={strokeWidth * 1.8} strokeDasharray={`${strokeWidth * 5} ${strokeWidth * 3}`} />}
+              {vectorTool === "vertices" && selectedEntityIds.flatMap((id) => { const entity = visiblePrimitives.find((item) => item.id === id); return entity?.type === "polyline" && entity.points ? entity.points.map((point, index) => <circle key={`${id}-vertex-${index}`} cx={point.x} cy={sy(point.y)} r={strokeWidth * 4} fill="#11191b" stroke="#ffd166" strokeWidth={strokeWidth * 1.4} onPointerDown={(event) => { event.stopPropagation(); vertexDragRef.current = { id, index }; }} />) : []; })}
               {measurePoints.length > 0 && <polyline points={measurePoints.map((point) => `${point.x},${sy(point.y)}`).join(" ")} fill="none" stroke="#ffcc66" strokeWidth={strokeWidth * 2} strokeDasharray={`${strokeWidth * 5} ${strokeWidth * 3}`} />}
               {measurePoints.map((point, index) => <g key={`measure-${index}`}><circle cx={point.x} cy={sy(point.y)} r={strokeWidth * 5} fill="#121a1c" stroke="#ffcc66" strokeWidth={strokeWidth * 1.5} /><text x={point.x} y={sy(point.y) + strokeWidth * 1.8} textAnchor="middle" fill="#ffcc66" fontSize={strokeWidth * 6}>{index + 1}</text></g>)}
             </svg><div className="north-arrow" aria-label="North"><span>N</span><i>↑</i></div><div className="scale-bar"><i style={{ width: `${Math.min(110, 55 * zoom)}px` }} /><span>{Math.max(1, Math.round(bounds.width / (10 * zoom)))} {drawing.unit === "metros" ? "m" : "u"}</span></div>{measureMode && <div className="measure-hint"><span>⌁</span>{t.measureHint}</div>}</div>
-            <footer className="statusbar"><span><i className="status-dot" />{t.ready}</span><span>X {viewX.toFixed(2)} · Y {(bounds.maxY - viewY).toFixed(2)}</span><span>1:{Math.max(1, Math.round(100 / zoom))}</span></footer>
+            <footer className="statusbar"><span><i className="status-dot" />{vectorTool === "select" ? t.ready : `${vt.ready}: ${vt[vectorTool]}`}</span><span>{cursorPoint ? `X ${cursorPoint.x.toFixed(2)} · Y ${cursorPoint.y.toFixed(2)}` : `X ${viewX.toFixed(2)} · Y ${(bounds.maxY - viewY).toFixed(2)}`}</span><span>{selectedEntityIds.length} {vt.selected} · 1:{Math.max(1, Math.round(100 / zoom))}</span></footer>
           </section>
 
           <aside className={`side-panel ${activePanel ? "open" : ""}`}>

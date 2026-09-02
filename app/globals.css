@@ -693,6 +693,119 @@ button {
   isolation: isolate;
 }
 
+.vector-toolbox {
+  position: absolute;
+  z-index: 4;
+  top: 12px;
+  left: 14px;
+  width: min(760px, calc(100% - 28px));
+  padding: 10px 12px 9px;
+  color: #c9d0cd;
+  background: rgba(17, 25, 27, 0.94);
+  border: 1px solid #3d4a4b;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.28);
+  backdrop-filter: blur(8px);
+}
+
+.vector-toolbox-heading,
+.vector-category-tabs,
+.vector-tool-list {
+  display: flex;
+  align-items: center;
+}
+
+.vector-toolbox-heading {
+  justify-content: space-between;
+  margin-bottom: 8px;
+  color: #e4e8e3;
+  font-size: 11px;
+}
+
+.vector-toolbox-heading span,
+.vector-draft-hint {
+  color: #82908c;
+  font: 10px ui-monospace, Consolas, monospace;
+}
+
+.vector-category-tabs {
+  gap: 4px;
+  overflow-x: auto;
+  margin-bottom: 8px;
+  padding-bottom: 2px;
+}
+
+.vector-category-tabs button,
+.vector-tool-list button {
+  border: 1px solid transparent;
+  background: transparent;
+  cursor: pointer;
+}
+
+.vector-category-tabs button {
+  flex: 0 0 auto;
+  padding: 6px 9px;
+  color: #8d9995;
+  font-size: 10px;
+  white-space: nowrap;
+}
+
+.vector-category-tabs button:hover,
+.vector-category-tabs button.active {
+  color: #f1c568;
+  background: rgba(214, 163, 75, 0.1);
+  border-color: rgba(214, 163, 75, 0.35);
+}
+
+.vector-tool-list {
+  gap: 5px;
+  overflow-x: auto;
+}
+
+.vector-tool-list button {
+  min-width: 57px;
+  min-height: 48px;
+  padding: 4px 6px;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  color: #91a09b;
+}
+
+.vector-tool-list button > span {
+  color: #d8dfd9;
+  font-size: 17px;
+  line-height: 1;
+}
+
+.vector-tool-list button small {
+  max-width: 75px;
+  overflow: hidden;
+  font-size: 9px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.vector-tool-list button:hover,
+.vector-tool-list button.active,
+.vector-tool-list button.toggled {
+  color: #f1c568;
+  background: rgba(214, 163, 75, 0.12);
+  border-color: rgba(214, 163, 75, 0.45);
+}
+
+.vector-tool-list button:hover > span,
+.vector-tool-list button.active > span,
+.vector-tool-list button.toggled > span {
+  color: #f1c568;
+}
+
+.vector-draft-hint {
+  margin-top: 7px;
+  color: #e0ad52;
+}
+
 .grid-overlay {
   position: absolute;
   inset: 0;
@@ -2144,6 +2257,21 @@ input:checked + .custom-check {
 
   .canvas-toolbar {
     padding-inline: 11px;
+  }
+
+  .vector-toolbox {
+    top: 8px;
+    left: 8px;
+    width: calc(100% - 16px);
+    padding: 8px;
+  }
+
+  .vector-category-tabs button {
+    padding: 6px 7px;
+  }
+
+  .vector-tool-list button {
+    min-width: 52px;
   }
 
   .crumb span,
