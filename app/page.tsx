@@ -23,7 +23,7 @@ import {
 } from "./cad-core";
 import { RasterOptions, vectorizeRaster } from "./raster-vectorizer";
 
-const APP_VERSION = "v17";
+const APP_VERSION = "v18";
 
 type Lang = "es" | "en" | "ar" | "fr" | "de" | "it" | "pt" | "zh" | "hi" | "ru" | "ja";
 type InstallPromptEvent = Event & {
@@ -645,9 +645,12 @@ export default function ArqueoCadMobile() {
     setRasterJob({ file, url: URL.createObjectURL(file) });
     setThreshold(165);
     setSimplify(0.6);
-    setDetail(2);
+    const compactDevice = window.matchMedia("(pointer: coarse)").matches || navigator.maxTouchPoints > 1 || window.innerWidth < 700;
+    setDetail(compactDevice ? 1 : 2);
     setClassifyLines(true);
-    setOcrEnabled(true);
+    // OCR remains available through the checkbox, but is opt-in on phones so
+    // the first vectorization is not delayed by downloading language data.
+    setOcrEnabled(!compactDevice);
     setDetectScale(true);
     setScaleBarLength("8");
     setRealWidth("");

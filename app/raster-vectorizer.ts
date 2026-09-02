@@ -630,7 +630,9 @@ async function vectorizeWithVTracer(binary: Uint8Array, width: number, height: n
 export async function vectorizeRaster(file: File, options: RasterOptions): Promise<Drawing> {
   const decoded = await decodeRaster(file);
   const bitmap = decoded.source;
-  const detailLimit = options.detail === 3 ? 1700 : options.detail === 2 ? 1400 : 1050;
+  // Keep the default workload bounded on phones while retaining a selectable
+  // maximum-detail mode for desktop review.
+  const detailLimit = options.detail === 3 ? 1300 : options.detail === 2 ? 1000 : 700;
   const reduction = Math.min(1, detailLimit / Math.max(decoded.width, decoded.height));
   const width = Math.max(1, Math.round(decoded.width * reduction));
   const height = Math.max(1, Math.round(decoded.height * reduction));
