@@ -23,6 +23,7 @@ export type Primitive = {
   text?: string;
   height?: number;
   rotation?: number;
+  confidence?: number;
   lineType?: "continuous" | "dashed";
   lineWeight?: number;
 };

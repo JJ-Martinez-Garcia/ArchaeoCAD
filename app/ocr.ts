@@ -21,6 +21,8 @@ export async function recognizeRasterText(source: HTMLCanvasElement): Promise<Oc
     const worker = await createWorker("spa+eng", 1, {
       logger: () => undefined,
       workerBlobURL: true,
+      workerPath: workerUrl,
+      cacheMethod: "write",
     });
     try {
       await worker.setParameters({
@@ -47,3 +49,4 @@ export async function recognizeRasterText(source: HTMLCanvasElement): Promise<Oc
     return [];
   }
 }
+import workerUrl from "tesseract.js/dist/worker.min.js?url";

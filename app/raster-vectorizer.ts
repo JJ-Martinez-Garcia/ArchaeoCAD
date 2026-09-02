@@ -27,6 +27,7 @@ type PathFeature = {
   angle: number;
   straightness: number;
   meanTurn: number;
+  roundness: number;
   closed: boolean;
   layer: string;
   dashed: boolean;
@@ -112,6 +113,52 @@ function normaliseGray(pixels: Uint8ClampedArray) {
   const range = high - low;
   for (let index = 0; index < gray.length; index += 1) gray[index] = Math.max(0, Math.min(255, Math.round((gray[index] - low) * 255 / range)));
   return gray;
+}
+
+function estimateSkewAngle(gray: Uint8Array, width: number, height: number) {
+  const step = Math.max(2, Math.ceil(Math.max(width, height) / 720));
+  const maxAngle = 0.07;
+  let bestAngle = 0;
+  let bestScore = 0;
+  for (let angle = -maxAngle; angle <= maxAngle; angle += 0.01) {
+    const bins = new Uint16Array(height + width + 8);
+    const cosine = Math.cos(angle);
+    const sine = Math.sin(angle);
+    for (let y = 0; y < height; y += step) {
+      for (let x = 0; x < width; x += step) {
+        if (gray[y * width + x] > 112) continue;
+        const rotatedY = Math.round((y - height / 2) * cosine - (x - width / 2) * sine + height / 2);
+        if (rotatedY >= 0 && rotatedY < bins.length) bins[rotatedY] += 1;
+      }
+    }
+    let score = 0;
+    for (let index = 0; index < bins.length; index += 1) score += bins[index] * bins[index];
+    if (score > bestScore) {
+      bestScore = score;
+      bestAngle = angle;
+    }
+  }
+  return Math.abs(bestAngle) >= 0.012 ? bestAngle : 0;
+}
+
+function deskewCanvas(canvas: HTMLCanvasElement, angle: number) {
+  if (!angle) return;
+  const width = canvas.width;
+  const height = canvas.height;
+  const rotated = document.createElement("canvas");
+  rotated.width = width;
+  rotated.height = height;
+  const context = rotated.getContext("2d");
+  if (!context) return;
+  context.fillStyle = "white";
+  context.fillRect(0, 0, width, height);
+  context.translate(width / 2, height / 2);
+  context.rotate(-angle);
+  context.drawImage(canvas, -width / 2, -height / 2);
+  const target = canvas.getContext("2d");
+  if (!target) return;
+  target.clearRect(0, 0, width, height);
+  target.drawImage(rotated, 0, 0);
 }
 
 function adaptiveBinary(gray: Uint8Array, width: number, height: number, globalThreshold: number) {
@@ -281,6 +328,13 @@ function pathFeature(pixels: number[], width: number): PathFeature {
   const start = points[0];
   const end = points[points.length - 1];
   const chord = Math.hypot(end.x - start.x, end.y - start.y);
+  let area = 0;
+  for (let index = 0; index < points.length; index += 1) {
+    const next = points[(index + 1) % points.length];
+    area += points[index].x * next.y - next.x * points[index].y;
+  }
+  const perimeter = Math.max(length, 1);
+  const roundness = chord <= 2.5 ? Math.min(1, (4 * Math.PI * Math.abs(area / 2)) / (perimeter * perimeter)) : 0;
   return {
     pixels,
     points,
@@ -292,6 +346,7 @@ function pathFeature(pixels: number[], width: number): PathFeature {
     angle: (Math.atan2(end.y - start.y, end.x - start.x) + Math.PI) % Math.PI,
     straightness: length ? chord / length : 0,
     meanTurn: points.length > 2 ? turnTotal / (points.length - 2) : 0,
+    roundness,
     closed: chord <= 2.5 && length > 8,
     layer: "01_ESTRUCTURAS",
     dashed: false,
@@ -324,11 +379,15 @@ function classify(features: PathFeature[], width: number, height: number) {
     const inNorth = feature.midY < height * 0.34 && feature.midX > width * 0.62;
     const nearBorder = (feature.midX < width * 0.025 || feature.midX > width * 0.975 || feature.midY < height * 0.025 || feature.midY > height * 0.975)
       && feature.length > diagonal * 0.08 && feature.straightness > 0.88;
-    const textLike = feature.closed && feature.points.length >= 6 && size < diagonal * 0.026 && feature.meanTurn > 0.22;
+    const symbolLike = feature.closed && size > diagonal * 0.008 && size < diagonal * 0.11
+      && (feature.roundness > 0.48 || (feature.points.length >= 8 && feature.meanTurn > 0.32));
+    const textLike = feature.closed && !symbolLike && feature.points.length >= 6 && size < diagonal * 0.026 && feature.meanTurn > 0.22;
     if (inScale || inNorth) {
       feature.layer = "07_ESCALA_NORTE";
     } else if (nearBorder) {
       feature.layer = "09_MARCO_LEYENDA";
+    } else if (symbolLike) {
+      feature.layer = "06_SIMBOLOS";
     } else if (textLike) {
       feature.layer = "08_TEXTOS_EDITABLES";
     } else if (feature.length > diagonal * 0.13 && feature.straightness > 0.92 && horizontalOrVertical) {
@@ -349,6 +408,7 @@ function classify(features: PathFeature[], width: number, height: number) {
     const evidence = [
       inScale || inNorth,
       nearBorder,
+      symbolLike,
       textLike,
       feature.closed,
       horizontalOrVertical,
@@ -430,6 +490,7 @@ function ocrPrimitives(texts: OcrText[], width: number, height: number, scale: n
     text: text.text,
     height: Math.max(1, (text.box.y1 - text.box.y0) * scale * 0.82),
     rotation: 0,
+    confidence: Math.min(0.99, Math.max(0, text.confidence / 100)),
     lineWeight: layerPresets["08_TEXTOS_EDITABLES"].lineWeight,
   }));
 }
@@ -503,7 +564,7 @@ async function vectorizeWithVTracer(binary: Uint8Array, width: number, height: n
       if (primitive.type !== "polyline" || !primitive.points?.length) return primitive;
       const feature = featureByPrimitive.get(index);
       const layer = options.classify && feature ? feature.layer : "01_LINEAS_VECTOR";
-      return { ...primitive, layer, color: layerPresets[layer].color, lineWeight: layerPresets[layer].lineWeight, points: primitive.points.map((point) => ({ x: point.x * scale, y: (height + point.y) * scale })) };
+      return { ...primitive, layer, color: layerPresets[layer].color, lineWeight: layerPresets[layer].lineWeight, confidence: options.classify ? feature?.confidence ?? 0.5 : 1, points: primitive.points.map((point) => ({ x: point.x * scale, y: (height + point.y) * scale })) };
     });
     primitives.push(...ocrPrimitives(ocrTexts, width, height, scale));
     const counts = new Map<string, number>();
@@ -546,6 +607,8 @@ export async function vectorizeRaster(file: File, options: RasterOptions): Promi
   context.fillRect(0, 0, width, height);
   context.drawImage(bitmap, 0, 0, width, height);
   bitmap.close();
+  const initialGray = normaliseGray(context.getImageData(0, 0, width, height).data);
+  deskewCanvas(canvas, estimateSkewAngle(initialGray, width, height));
   const gray = normaliseGray(context.getImageData(0, 0, width, height).data);
   const binary = adaptiveBinary(gray, width, height, options.threshold);
   const detectedScalePixels = options.scaleBarLength ? detectScaleBar(binary, width, height) : null;
@@ -583,6 +646,7 @@ export async function vectorizeRaster(file: File, options: RasterOptions): Promi
       closed: feature.closed,
       lineType: feature.dashed ? "dashed" : "continuous",
       lineWeight: preset.lineWeight,
+      confidence: options.classify ? feature.confidence : 1,
     };
   }).filter((entity) => (entity.points?.length ?? 0) >= 2);
   primitives.push(...ocrPrimitives(ocrTexts, width, height, scale));

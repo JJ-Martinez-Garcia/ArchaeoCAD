@@ -23,7 +23,7 @@ import {
 } from "./cad-core";
 import { RasterOptions, vectorizeRaster } from "./raster-vectorizer";
 
-const APP_VERSION = "v14";
+const APP_VERSION = "v15";
 
 type Lang = "es" | "en" | "ar" | "fr" | "de" | "it" | "pt" | "zh" | "hi" | "ru" | "ja";
 type InstallPromptEvent = Event & {
@@ -159,6 +159,10 @@ const copy = {
     aboutTitle: "Acerca de ArqueoCAD",
     aboutBodyPrefix: "Esta aplicación forma parte del",
     aboutBodySuffix: "de José Javier Martínez García",
+    reviewTitle: "Revisión sugerida",
+    reviewHelp: "Estas entidades tienen menor confianza. Puedes cambiar su capa aquí y exportar la corrección.",
+    reviewTarget: "Mover a capa",
+    confidenceLabel: "confianza",
   },
   en: {
     brandTag: "FIELD DRAWING",
@@ -287,6 +291,10 @@ const copy = {
     aboutTitle: "About ArqueoCAD",
     aboutBodyPrefix: "This application is part of",
     aboutBodySuffix: "by José Javier Martínez García",
+    reviewTitle: "Suggested review",
+    reviewHelp: "These entities have lower confidence. Change their layer here and export the correction.",
+    reviewTarget: "Move to layer",
+    confidenceLabel: "confidence",
   },
   ar: {
     brandTag: "الرسم الميداني",
@@ -415,6 +423,10 @@ const copy = {
     aboutTitle: "حول ArqueoCAD",
     aboutBodyPrefix: "هذا التطبيق جزء من",
     aboutBodySuffix: "لـ خوسيه خافيير مارتينيث غارسيا",
+    reviewTitle: "مراجعة مقترحة",
+    reviewHelp: "هذه العناصر ذات ثقة أقل. يمكنك تغيير طبقتها هنا ثم تصدير التصحيح.",
+    reviewTarget: "نقل إلى الطبقة",
+    confidenceLabel: "الثقة",
   },
 } as const;
 
@@ -587,6 +599,7 @@ export default function ArqueoCadMobile() {
   const selectedCount = layers.filter((layer) => layer.selected).length;
   const visibleCount = layers.filter((layer) => layer.visible).length;
   const filteredLayers = layers.filter((layer) => layer.name.toLowerCase().includes(search.toLowerCase()));
+  const reviewEntities = useMemo(() => primitives.filter((entity) => typeof entity.confidence === "number" && entity.confidence < 0.5).slice(0, 40), [primitives]);
   const metrics = measurement(measurePoints);
   const viewWidth = bounds.width / zoom;
   const viewHeight = bounds.height / zoom;
@@ -706,6 +719,16 @@ export default function ArqueoCadMobile() {
 
   function updateLayer(name: string, field: "visible" | "selected") {
     setDrawing((current) => current ? ({ ...current, layers: current.layers.map((layer) => layer.name === name ? { ...layer, [field]: !layer[field] } : layer) }) : current);
+  }
+
+  function moveEntityToLayer(id: string, layerName: string) {
+    setDrawing((current) => {
+      if (!current || !current.layers.some((layer) => layer.name === layerName)) return current;
+      const nextPrimitives = current.primitives.map((entity) => entity.id === id ? { ...entity, layer: layerName, color: current.layers.find((layer) => layer.name === layerName)?.color } : entity);
+      const counts = new Map<string, number>();
+      nextPrimitives.forEach((entity) => counts.set(entity.layer, (counts.get(entity.layer) ?? 0) + 1));
+      return { ...current, primitives: nextPrimitives, layers: current.layers.map((layer) => ({ ...layer, count: counts.get(layer.name) ?? 0 })) };
+    });
   }
 
   function selectAll(selected: boolean) {
@@ -838,7 +861,8 @@ export default function ArqueoCadMobile() {
           <aside className={`side-panel ${activePanel ? "open" : ""}`}>
             {activePanel === "layers" && <><div className="panel-heading"><div><span className="eyebrow">{t.content}</span><h2>{t.layers}</h2></div><button className="close-panel" onClick={() => setActivePanel(null)} aria-label={t.close}>×</button></div><div className="layer-stats"><span><b>{selectedCount}</b> {t.selected}</span><i /><span><b>{visibleCount}</b> {t.visible}</span></div><label className="search-box"><span>⌕</span><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder={t.search} /></label><div className="select-actions"><button onClick={() => selectAll(true)}>{t.all}</button><button onClick={() => selectAll(false)}>{t.none}</button></div><div className="layer-list">{filteredLayers.map((layer) => <div className="layer-row" key={layer.name}><button className={`eye-button ${layer.visible ? "visible" : ""}`} onClick={() => updateLayer(layer.name, "visible")} aria-label={`${layer.visible ? t.hide : t.show} ${layer.name}`}><span /></button><label><input type="checkbox" checked={layer.selected} onChange={() => updateLayer(layer.name, "selected")} /><span className="custom-check">✓</span></label><span className="layer-swatch" style={{ background: layer.color }} /><div className="layer-name"><strong>{layer.name}</strong><small>{layer.count} {t.entities}{layer.auxiliary ? ` · ${t.auxiliaryLabel}` : ""}</small></div></div>)}</div><p className="panel-help"><span>i</span>{t.layerHelp}</p><div className="panel-footer"><button className="primary-button export-button" onClick={() => setExportOpen(true)} disabled={!selectedCount}><span>⇩</span>{t.export}<small>{selectedCount}</small></button></div></>}
             {activePanel === "warnings" && <><div className="panel-heading"><div><span className="eyebrow">{t.quality}</span><h2>{t.warnings}</h2></div><button className="close-panel" onClick={() => setActivePanel(null)} aria-label={t.close}>×</button></div><div className="warning-list">{drawing.warnings.length ? drawing.warnings.map((warning, index) => <article key={index}><span>!</span><p>{warningText(warning, lang)}</p></article>) : <div className="empty-state"><span>✓</span><p>{t.noWarnings}</p></div>}</div></>}
-          </aside>
+             {activePanel === "warnings" && reviewEntities.length > 0 && <section className="review-card"><div className="panel-heading"><div><span className="eyebrow">OCR / CAD</span><h3>{t.reviewTitle}</h3></div></div><p>{t.reviewHelp}</p><div className="review-list">{reviewEntities.map((entity) => <label key={entity.id}><span>{entity.type === "text" ? entity.text : entity.id}</span><small>{Math.round((entity.confidence ?? 0) * 100)}% {t.confidenceLabel}</small><select value={entity.layer} onChange={(event) => moveEntityToLayer(entity.id, event.target.value)} aria-label={`${t.reviewTarget} ${entity.id}`}>{layers.filter((layer) => !layer.auxiliary).map((layer) => <option key={layer.name} value={layer.name}>{layer.name}</option>)}</select></label>)}</div></section>}
+           </aside>
         </>}
       </section>
 

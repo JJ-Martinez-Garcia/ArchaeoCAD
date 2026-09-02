@@ -24,7 +24,7 @@ test("ships ArqueoCAD as a multilingual installable mobile application", async (
   assert.match(page, /image\/png,image\/jpeg,image\/webp,image\/bmp/);
   assert.match(page, /Este es un software gratuito y de libre distribución creado por José Javier Martínez/);
   assert.match(page, /http:\/\/www\.josejaviermartinez\.com/);
-  assert.match(page, /const APP_VERSION = "v14"/);
+  assert.match(page, /const APP_VERSION = "v15"/);
   assert.match(page, /className="language-select"/);
   assert.match(page, /code: "fr", label: "Français"/);
   assert.match(page, /code: "zh", label: "中文"/);
@@ -38,6 +38,11 @@ test("ships ArqueoCAD as a multilingual installable mobile application", async (
   assert.match(vectorizer, /recognizeRasterText/);
   assert.match(vectorizer, /08_TEXTOS_EDITABLES/);
   assert.match(vectorizer, /ocrTexts/);
+  assert.match(vectorizer, /deskewCanvas/);
+  assert.match(vectorizer, /symbolLike/);
+  assert.match(vectorizer, /confidence/);
+  assert.match(page, /reviewEntities/);
+  assert.match(page, /moveEntityToLayer/);
   assert.match(vectorizer, /referenceLayerPriors/);
   assert.match(vectorizer, /baja confianza de clasificación/);
   assert.match(vectorizer, /08_TEXTOS_EDITABLES/);
