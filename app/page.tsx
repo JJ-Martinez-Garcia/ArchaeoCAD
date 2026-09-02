@@ -24,7 +24,7 @@ import {
 } from "./cad-core";
 import { RasterOptions, vectorizeRaster } from "./raster-vectorizer";
 
-const APP_VERSION = "v26";
+const APP_VERSION = "v27";
 
 type VectorCategory = "draw" | "modify" | "geometry" | "precision" | "organize";
 type VectorTool = "select" | "point" | "line" | "polyline" | "polygon" | "rectangle" | "circle" | "arc" | "move" | "copy" | "rotate" | "scale" | "mirror" | "offset" | "vertices" | "trim" | "extend" | "split" | "join" | "explode" | "snap" | "ortho" | "grid" | "coordinates" | "layers" | "properties" | "order";
@@ -973,7 +973,21 @@ export default function ArqueoCadMobile() {
       setToast(vt.join);
       return;
     }
-    if (["trim", "extend", "vertices"].includes(tool)) {
+    if (tool === "trim" || tool === "extend") {
+      if (!selectedEntityIds.length) { setToast(`${vt[tool]}: ${vt.hint.toLowerCase()}`); return; }
+      setDrawing((current) => current ? { ...current, primitives: current.primitives.map((entity) => {
+        if (!selectedEntityIds.includes(entity.id) || entity.type !== "polyline" || !entity.points || entity.points.length < 3) return entity;
+        if (tool === "trim") return { ...entity, points: entity.points.slice(0, -1), closed: false };
+        const end = entity.points[entity.points.length - 1];
+        const previous = entity.points[entity.points.length - 2];
+        const length = Math.max(0.001, Math.hypot(end.x - previous.x, end.y - previous.y));
+        const extension = { x: end.x + (end.x - previous.x) / length, y: end.y + (end.y - previous.y) / length };
+        return { ...entity, points: [...entity.points, extension], closed: false };
+      }) } : current);
+      setToast(vt[tool]);
+      return;
+    }
+    if (tool === "vertices") {
       setToast(`${vt[tool]}: ${selectedEntityIds.length ? vt.ready.toLowerCase() : vt.hint.toLowerCase()}`);
       return;
     }
