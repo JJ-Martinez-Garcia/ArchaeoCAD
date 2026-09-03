@@ -611,7 +611,9 @@ async function vectorizeWithVTracer(binary: Uint8Array, width: number, height: n
     converter = BinaryImageConverter.new_with_string(JSON.stringify({
       canvas_id: canvas.id,
       svg_id: svg.id,
-      mode: options.detail === 3 ? "spline" : "polygon",
+      // Curved paths preserve the plan's geometry at every detail level.
+      // The resulting sampled points are rendered as smooth spline-like CAD paths.
+      mode: "spline",
       // Preserve corners and short bends; simplification is applied later to
       // the sampled CAD polyline, not by aggressively discarding VTracer nodes.
       corner_threshold: options.detail === 3 ? 42 : 52,
@@ -619,7 +621,7 @@ async function vectorizeWithVTracer(binary: Uint8Array, width: number, height: n
       max_iterations: options.detail === 3 ? 20 : options.detail === 2 ? 14 : 10,
       splice_threshold: options.detail === 3 ? 28 : 38,
       filter_speckle: options.detail === 3 ? 2 : options.detail === 2 ? 3 : 5,
-      path_precision: options.detail === 3 ? 5 : 4,
+      path_precision: options.detail === 3 ? 6 : 5,
     }));
     converter.init();
     await new Promise<void>((resolve, reject) => {
@@ -645,9 +647,11 @@ async function vectorizeWithVTracer(binary: Uint8Array, width: number, height: n
       featureByPrimitive.set(index, pathFeature(pixels, width));
     });
     const features = [...featureByPrimitive.values()];
-    const ambiguous = options.classify && features.length ? classify(features, Math.max(bounds.width, 1), Math.max(bounds.height, 1)) : 0;
+    const ambiguous = options.classify && features.length ? classify(features, Math.max(width, 1), Math.max(height, 1)) : 0;
     const scaleBarScale = options.scaleBarLength && detectedScalePixels ? options.scaleBarLength / detectedScalePixels : null;
-    const scale = options.realWidth && options.realWidth > 0 ? options.realWidth / Math.max(bounds.width, 1) : scaleBarScale ?? 1;
+    // Calibrate against source pixels, never the padded display bounds. This keeps
+    // every path in the same coordinate system as the uploaded raster.
+    const scale = options.realWidth && options.realWidth > 0 ? options.realWidth / Math.max(width, 1) : scaleBarScale ?? 1;
     const primitives = parsed.primitives.map((primitive, index) => {
       if (primitive.type !== "polyline" || !primitive.points?.length) return primitive;
       const feature = featureByPrimitive.get(index);

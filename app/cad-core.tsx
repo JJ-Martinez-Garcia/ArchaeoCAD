@@ -366,14 +366,14 @@ function parsePathData(value: string) {
   const has = (count: number) => index + count <= tokens.length && !isCommand(tokens[index]);
   const add = (point: Point) => { subpaths[subpaths.length - 1].push({ x: point.x, y: -point.y }); current = point; };
   const sampleCubic = (p0: Point, p1: Point, p2: Point, p3: Point) => {
-    for (let step = 1; step <= 10; step += 1) {
+    for (let step = 1; step <= 16; step += 1) {
       const t = step / 10;
       const mt = 1 - t;
       add({ x: mt ** 3 * p0.x + 3 * mt ** 2 * t * p1.x + 3 * mt * t ** 2 * p2.x + t ** 3 * p3.x, y: mt ** 3 * p0.y + 3 * mt ** 2 * t * p1.y + 3 * mt * t ** 2 * p2.y + t ** 3 * p3.y });
     }
   };
   const sampleQuadratic = (p0: Point, p1: Point, p2: Point) => {
-    for (let step = 1; step <= 8; step += 1) {
+    for (let step = 1; step <= 12; step += 1) {
       const t = step / 8;
       const mt = 1 - t;
       add({ x: mt ** 2 * p0.x + 2 * mt * t * p1.x + t ** 2 * p2.x, y: mt ** 2 * p0.y + 2 * mt * t * p1.y + t ** 2 * p2.y });
