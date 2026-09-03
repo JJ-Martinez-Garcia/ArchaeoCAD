@@ -24,7 +24,7 @@ import {
 } from "./cad-core";
 import { RasterOptions, vectorizeRaster } from "./raster-vectorizer";
 
-const APP_VERSION = "v32";
+const APP_VERSION = "v33";
 
 type VectorCategory = "draw" | "modify" | "geometry" | "precision" | "organize";
 type VectorTool = "select" | "point" | "line" | "polyline" | "polygon" | "rectangle" | "circle" | "arc" | "move" | "copy" | "rotate" | "scale" | "mirror" | "offset" | "vertices" | "trim" | "extend" | "split" | "join" | "explode" | "snap" | "ortho" | "grid" | "coordinates" | "layers" | "properties" | "order";
@@ -105,6 +105,30 @@ const vectorToolsCopy = {
     ready: "Active tool",
   },
 } as const;
+
+const vectorLocaleOverrides: Partial<Record<Lang, Partial<typeof vectorToolsCopy.es>>> = {
+  fr: { title: "Édition vectorielle", draw: "Dessin", modify: "Modifier", geometry: "Géométrie", precision: "Précision", organize: "Organisation", select: "Sélectionner", point: "Point", line: "Ligne", polyline: "Polyligne", polygon: "Polygone", rectangle: "Rectangle", circle: "Cercle", arc: "Arc", move: "Déplacer", copy: "Copier", rotate: "Pivoter", scale: "Échelle", mirror: "Miroir", vertices: "Sommets", trim: "Rogner", extend: "Prolonger", split: "Scinder", join: "Joindre", explode: "Décomposer", properties: "Propriétés", order: "Ordre de dessin", hint: "Sélectionnez une entité et choisissez un outil", selected: "sélectionnées", ready: "Outil actif" },
+  de: { title: "Vektorbearbeitung", draw: "Zeichnen", modify: "Ändern", geometry: "Geometrie bearbeiten", precision: "Präzision", organize: "Organisation", select: "Auswählen", point: "Punkt", line: "Linie", polyline: "Polylinie", polygon: "Polygon", rectangle: "Rechteck", circle: "Kreis", arc: "Bogen", move: "Verschieben", copy: "Kopieren", rotate: "Drehen", scale: "Skalieren", mirror: "Spiegeln", vertices: "Eckpunkte", trim: "Trimmen", extend: "Verlängern", split: "Teilen", join: "Verbinden", explode: "Auflösen", properties: "Eigenschaften", order: "Zeichenreihenfolge", hint: "Entität auswählen und Werkzeug wählen", selected: "ausgewählt", ready: "Aktives Werkzeug" },
+  it: { title: "Modifica vettoriale", draw: "Disegno", modify: "Modifica", geometry: "Modifica geometria", precision: "Precisione", organize: "Organizzazione", select: "Seleziona", point: "Punto", line: "Linea", polyline: "Polilinea", polygon: "Poligono", rectangle: "Rettangolo", circle: "Cerchio", arc: "Arco", move: "Sposta", copy: "Copia", rotate: "Ruota", scale: "Scala", mirror: "Specchia", vertices: "Vertici", trim: "Taglia", extend: "Estendi", split: "Dividi", join: "Unisci", explode: "Esplodi", properties: "Proprietà", order: "Ordine di disegno", hint: "Seleziona un'entità e scegli uno strumento", selected: "selezionate", ready: "Strumento attivo" },
+  pt: { title: "Edição vetorial", draw: "Desenho", modify: "Modificar", geometry: "Editar geometria", precision: "Precisão", organize: "Organização", select: "Selecionar", point: "Ponto", line: "Linha", polyline: "Polilinha", polygon: "Polígono", rectangle: "Retângulo", circle: "Círculo", arc: "Arco", move: "Mover", copy: "Copiar", rotate: "Rodar", scale: "Escalar", mirror: "Espelhar", vertices: "Vértices", trim: "Aparar", extend: "Estender", split: "Dividir", join: "Unir", explode: "Explodir", properties: "Propriedades", order: "Ordem de desenho", hint: "Selecione uma entidade e escolha uma ferramenta", selected: "selecionadas", ready: "Ferramenta ativa" },
+  ar: { title: "تحرير المتجهات", draw: "رسم", modify: "تعديل", geometry: "تحرير الهندسة", precision: "دقة", organize: "تنظيم", select: "تحديد", point: "نقطة", line: "خط", polyline: "خط متعدد", polygon: "مضلع", rectangle: "مستطيل", circle: "دائرة", arc: "قوس", move: "نقل", copy: "نسخ", rotate: "تدوير", scale: "تحجيم", mirror: "انعكاس", vertices: "رؤوس", trim: "قص", extend: "تمديد", split: "تقسيم", join: "ضم", explode: "تفكيك", properties: "خصائص", order: "ترتيب الرسم", hint: "حدد عنصراً واختر أداة", selected: "محددة", ready: "الأداة النشطة" },
+  zh: { title: "矢量编辑", draw: "绘图", modify: "修改", geometry: "编辑几何图形", precision: "精度", organize: "组织", select: "选择", point: "点", line: "线", polyline: "折线", polygon: "多边形", rectangle: "矩形", circle: "圆", arc: "弧", move: "移动", copy: "复制", rotate: "旋转", scale: "缩放", mirror: "镜像", vertices: "顶点", trim: "修剪", extend: "延伸", split: "分割", join: "合并", explode: "分解", properties: "属性", order: "绘图顺序", hint: "选择对象并选择工具", selected: "已选择", ready: "当前工具" },
+  hi: { title: "वेक्टर संपादन", draw: "ड्रॉ", modify: "संशोधित करें", geometry: "ज्यामिति संपादित करें", precision: "सटीकता", organize: "संगठन", select: "चुनें", point: "बिंदु", line: "रेखा", polyline: "पॉलीलाइन", polygon: "बहुभुज", rectangle: "आयत", circle: "वृत्त", arc: "चाप", move: "स्थानांतरित करें", copy: "कॉपी", rotate: "घुमाएँ", scale: "स्केल", mirror: "मिरर", vertices: "शीर्ष", trim: "ट्रिम", extend: "बढ़ाएँ", split: "विभाजित करें", join: "जोड़ें", explode: "विस्फोटित करें", properties: "गुण", order: "ड्रॉ क्रम", hint: "इकाई चुनें और उपकरण चुनें", selected: "चयनित", ready: "सक्रिय उपकरण" },
+  ru: { title: "Векторное редактирование", draw: "Рисование", modify: "Изменить", geometry: "Правка геометрии", precision: "Точность", organize: "Организация", select: "Выбрать", point: "Точка", line: "Линия", polyline: "Полилиния", polygon: "Многоугольник", rectangle: "Прямоугольник", circle: "Круг", arc: "Дуга", move: "Переместить", copy: "Копировать", rotate: "Повернуть", scale: "Масштаб", mirror: "Зеркало", vertices: "Вершины", trim: "Обрезать", extend: "Продлить", split: "Разделить", join: "Объединить", explode: "Разбить", properties: "Свойства", order: "Порядок отрисовки", hint: "Выберите объект и инструмент", selected: "выбрано", ready: "Активный инструмент" },
+  ja: { title: "ベクトル編集", draw: "描画", modify: "変更", geometry: "ジオメトリ編集", precision: "精度", organize: "整理", select: "選択", point: "点", line: "線", polyline: "ポリライン", polygon: "ポリゴン", rectangle: "長方形", circle: "円", arc: "円弧", move: "移動", copy: "コピー", rotate: "回転", scale: "拡大縮小", mirror: "ミラー", vertices: "頂点", trim: "トリム", extend: "延長", split: "分割", join: "結合", explode: "分解", properties: "プロパティ", order: "描画順序", hint: "エンティティとツールを選択", selected: "選択済み", ready: "アクティブなツール" },
+};
+
+const vectorTermOverrides: Partial<Record<Lang, Partial<typeof vectorToolsCopy.es>>> = {
+  fr: { offset: "Décalage", snap: "Accrochage", ortho: "Ortho", grid: "Grille", coordinates: "Coordonnées", layers: "Calques" },
+  de: { offset: "Versatz", snap: "Fangmodus", ortho: "Ortho", grid: "Raster", coordinates: "Koordinaten", layers: "Ebenen" },
+  it: { offset: "Offset", snap: "Aggancio", ortho: "Orto", grid: "Griglia", coordinates: "Coordinate", layers: "Livelli" },
+  pt: { offset: "Deslocamento", snap: "Snap", ortho: "Orto", grid: "Grelha", coordinates: "Coordenadas", layers: "Camadas" },
+  ar: { offset: "إزاحة", snap: "التقاط", ortho: "متعامد", grid: "شبكة", coordinates: "إحداثيات", layers: "طبقات" },
+  zh: { offset: "偏移", snap: "捕捉", ortho: "正交", grid: "网格", coordinates: "坐标", layers: "图层" },
+  hi: { offset: "ऑफसेट", snap: "स्नैप", ortho: "ऑर्थो", grid: "ग्रिड", coordinates: "निर्देशांक", layers: "लेयर" },
+  ru: { offset: "Смещение", snap: "Привязка", ortho: "Орто", grid: "Сетка", coordinates: "Координаты", layers: "Слои" },
+  ja: { offset: "オフセット", snap: "スナップ", ortho: "直交", grid: "グリッド", coordinates: "座標", layers: "レイヤー" },
+};
 
 const vectorCategoryTools: Record<VectorCategory, VectorTool[]> = {
   draw: ["select", "point", "line", "polyline", "polygon", "rectangle", "circle", "arc"],
@@ -277,6 +301,11 @@ const copy = {
     savedProject: "Proyecto guardado en el dispositivo",
     saveCancelled: "Guardado cancelado",
     switchProject: "Cambiar proyecto",
+    zoomOut: "Alejar",
+    zoomIn: "Acercar",
+    north: "Norte",
+    draftHint: "puntos · doble clic para terminar la polilínea",
+    home: "ArchaeoCAD — portada",
   },
   en: {
     brandTag: "FIELD DRAWING",
@@ -419,6 +448,11 @@ const copy = {
     savedProject: "Project saved on this device",
     saveCancelled: "Save cancelled",
     switchProject: "Switch project",
+    zoomOut: "Zoom out",
+    zoomIn: "Zoom in",
+    north: "North",
+    draftHint: "points · double-click to finish the polyline",
+    home: "ArchaeoCAD — cover",
   },
   ar: {
     brandTag: "الرسم الميداني",
@@ -547,6 +581,11 @@ const copy = {
     aboutTitle: "حول ArqueoCAD",
     aboutBodyPrefix: "هذا التطبيق جزء من",
     aboutBodySuffix: "لـ خوسيه خافيير مارتينيث غارسيا",
+    zoomOut: "تصغير",
+    zoomIn: "تكبير",
+    north: "الشمال",
+    draftHint: "نقاط · انقر نقراً مزدوجاً لإنهاء الخط المتعدد",
+    home: "ArchaeoCAD — الغلاف",
     reviewTitle: "مراجعة مقترحة",
     reviewHelp: "هذه العناصر ذات ثقة أقل. يمكنك تغيير طبقتها هنا ثم تصدير التصحيح.",
     reviewTarget: "نقل إلى الطبقة",
@@ -579,6 +618,17 @@ const languageOverrides: Partial<Record<Exclude<Lang, "es" | "en" | "ar">, Parti
   hi: { brandTag: "फील्ड ड्रॉइंग", open: "प्लान खोलें", openShort: "खोलें", vectorize: "चित्र वेक्टराइज़ करें", layers: "लेयर", measure: "मापें", export: "निर्यात", warnings: "सूचनाएँ", fit: "प्लान फिट करें", noDrawing: "कोई प्लान खुला नहीं", chooseLanguage: "भाषा", drawing: "प्लान", content: "प्लान सामग्री", quality: "गुणवत्ता नियंत्रण", search: "लेयर खोजें…", all: "सभी", none: "कोई नहीं", close: "बंद करें", cancel: "रद्द करें", download: "ZIP बनाएँ", rasterTitle: "रास्टर चित्र वेक्टराइज़ करें", classify: "रेखा प्रकार वर्गीकृत करें", process: "ज्यामिति बनाएँ", install: "इंस्टॉल", installTitle: "ArqueoCAD इंस्टॉल करें", help: "सहायता", helpTitle: "ArqueoCAD Mobile मैनुअल", footerText: "José Javier Martínez द्वारा बनाया गया निःशुल्क, मुक्त वितरण सॉफ़्टवेयर।", about: "परिचय", aboutTitle: "ArqueoCAD के बारे में", aboutBodyPrefix: "यह एप्लिकेशन इसका हिस्सा है", aboutBodySuffix: "José Javier Martínez García का" },
   ru: { brandTag: "ПОЛЕВОЙ ЧЕРТЁЖ", open: "Открыть план", openShort: "Открыть", vectorize: "Векторизовать изображение", layers: "Слои", measure: "Измерить", export: "Экспорт", warnings: "Предупреждения", fit: "Вписать план", noDrawing: "План не открыт", chooseLanguage: "Язык", drawing: "План", content: "СОДЕРЖИМОЕ ПЛАНА", quality: "КОНТРОЛЬ КАЧЕСТВА", search: "Поиск слоя…", all: "Все", none: "Нет", close: "Закрыть", cancel: "Отмена", download: "Создать ZIP", rasterTitle: "Векторизация растра", classify: "Классифицировать типы линий", process: "Создать геометрию", install: "Установить", installTitle: "Установить ArqueoCAD", help: "Помощь", helpTitle: "Руководство ArqueoCAD Mobile", footerText: "Бесплатное свободно распространяемое ПО José Javier Martínez.", about: "О приложении", aboutTitle: "О ArqueoCAD", aboutBodyPrefix: "Это приложение является частью", aboutBodySuffix: "José Javier Martínez García" },
   ja: { brandTag: "現地図面", open: "図面を開く", openShort: "開く", vectorize: "画像をベクトル化", layers: "レイヤー", measure: "測定", export: "書き出し", warnings: "警告", fit: "図面に合わせる", noDrawing: "図面が開かれていません", chooseLanguage: "言語", drawing: "図面", content: "図面の内容", quality: "品質管理", search: "レイヤーを検索…", all: "すべて", none: "なし", close: "閉じる", cancel: "キャンセル", download: "ZIPを作成", rasterTitle: "ラスター画像をベクトル化", classify: "線種を分類", process: "ジオメトリを生成", install: "インストール", installTitle: "ArqueoCADをインストール", help: "ヘルプ", helpTitle: "ArqueoCAD Mobile マニュアル", footerText: "José Javier Martínez が作成した無料・自由配布ソフトウェア。", about: "概要", aboutTitle: "ArqueoCADについて", aboutBodyPrefix: "このアプリは", aboutBodySuffix: "José Javier Martínez García の一部です" },
+};
+
+const uiLocaleOverrides: Partial<Record<Lang, Partial<Copy>>> = {
+  fr: { zoomOut: "Zoom arrière", zoomIn: "Zoom avant", north: "Nord", draftHint: "points · double-clic pour terminer la polyligne", home: "ArchaeoCAD — accueil" },
+  de: { zoomOut: "Verkleinern", zoomIn: "Vergrößern", north: "Norden", draftHint: "Punkte · Doppelklick zum Beenden der Polylinie", home: "ArchaeoCAD — Startseite" },
+  it: { zoomOut: "Riduci zoom", zoomIn: "Aumenta zoom", north: "Nord", draftHint: "punti · doppio clic per terminare la polilinea", home: "ArchaeoCAD — home" },
+  pt: { zoomOut: "Afastar", zoomIn: "Aproximar", north: "Norte", draftHint: "pontos · duplo clique para terminar a polilinha", home: "ArchaeoCAD — início" },
+  zh: { zoomOut: "缩小", zoomIn: "放大", north: "北方", draftHint: "个点 · 双击完成折线", home: "ArchaeoCAD — 首页" },
+  hi: { zoomOut: "ज़ूम आउट", zoomIn: "ज़ूम इन", north: "उत्तर", draftHint: "बिंदु · पॉलीलाइन समाप्त करने के लिए डबल-क्लिक करें", home: "ArchaeoCAD — मुखपृष्ठ" },
+  ru: { zoomOut: "Уменьшить", zoomIn: "Увеличить", north: "Север", draftHint: "точек · дважды щёлкните для завершения полилинии", home: "ArchaeoCAD — главная" },
+  ja: { zoomOut: "縮小", zoomIn: "拡大", north: "北", draftHint: "点 · ダブルクリックでポリラインを終了", home: "ArchaeoCAD — ホーム" },
 };
 
 function browserLanguage(): Lang {
@@ -672,9 +722,9 @@ export default function ArqueoCadMobile() {
   const svgRef = useRef<SVGSVGElement>(null);
   const dragRef = useRef<{ x: number; y: number; panX: number; panY: number; moved: boolean } | null>(null);
   const vertexDragRef = useRef<{ id: string; index: number } | null>(null);
-  const rawCopy = lang === "es" ? copy.es : lang === "en" ? copy.en : lang === "ar" ? copy.ar : { ...copy.es, ...(languageOverrides[lang] ?? {}) };
+  const rawCopy = { ...(lang === "es" ? copy.es : lang === "en" ? copy.en : lang === "ar" ? copy.ar : { ...copy.es, ...(languageOverrides[lang] ?? {}) }), ...(uiLocaleOverrides[lang] ?? {}) };
   const t: Copy = Object.fromEntries(Object.entries(rawCopy).map(([key, value]) => [key, typeof value === "string" ? value.replaceAll("ArqueoCAD", "ArchaeoCAD") : value])) as Copy;
-  const vt = lang === "en" ? vectorToolsCopy.en : vectorToolsCopy.es;
+  const vt = { ...(lang === "en" ? vectorToolsCopy.en : vectorToolsCopy.es), ...(vectorLocaleOverrides[lang] ?? {}), ...(vectorTermOverrides[lang] ?? {}) };
 
   useEffect(() => {
     if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js", { updateViaCache: "none" }).then((registration) => registration.update()).catch(() => undefined);
@@ -1226,7 +1276,7 @@ export default function ArqueoCadMobile() {
       <input ref={rasterInputRef} className="sr-only" type="file" accept="image/png,image/jpeg,image/webp,image/bmp" onChange={onRasterInput} />
 
       <header className="topbar">
-        <button className="brand-block brand-home" onClick={goToCover} aria-label="ArchaeoCAD — portada"><div className="brand-mark" aria-hidden="true"><span>A</span></div><div><strong>ArchaeoCAD</strong><small>{t.brandTag} · {APP_VERSION}</small></div></button>
+        <button className="brand-block brand-home" onClick={goToCover} aria-label={t.home}><div className="brand-mark" aria-hidden="true"><span>A</span></div><div><strong>ArchaeoCAD</strong><small>{t.brandTag} · {APP_VERSION}</small></div></button>
         <div className="file-summary" title={drawing?.name ?? t.noDrawing}>
           <span className="format-badge">{drawing ? (drawing.format === "RASTER" ? "IMG" : drawing.format) : "—"}</span>
           <div><strong>{drawing?.name ?? t.noDrawing}</strong><small>{drawing ? `${drawing.primitives.length.toLocaleString(lang)} ${t.entities} · ${drawing.layers.length} ${t.layers.toLowerCase()} · ${drawing.unit}` : t.noDrawingMeta}</small></div>
@@ -1258,8 +1308,8 @@ export default function ArqueoCadMobile() {
           <section className="recent-projects" aria-label={t.projects}><div className="recent-projects-heading"><strong>{t.projects}</strong><span>{recentProjects.length}/8</span></div>{recentProjects.length ? <div className="recent-project-list">{recentProjects.map((project) => <article key={project.id} className="recent-project"><button className="recent-project-main" onClick={() => openRecentProject(project)} title={project.drawing ? t.openProject : t.projectUnavailable} disabled={!project.drawing}><strong title={project.name}>{project.name.replace(/\.[^.]+$/, "")}</strong><small>{project.format} · {project.entities} {t.entities} · {project.layers} {t.layers.toLowerCase()}</small></button><button onClick={() => deleteRecentProject(project.id)} aria-label={`${t.deleteProject}: ${project.name}`} title={t.deleteProject}>×</button></article>)}</div> : <p className="recent-project-empty">{t.noProjects}</p>}</section>
         </section> : <>
           <section className="canvas-area" aria-label={t.drawing}>
-            <div className="canvas-toolbar"><div className="crumb"><span>{t.drawing}</span><b>/</b><strong>{drawing.name.replace(/\.[^.]+$/, "")}</strong></div><div className="view-controls"><button onClick={() => setZoom((value) => Math.max(0.65, value / 1.2))} aria-label="Zoom out">−</button><output>{Math.round(zoom * 100)}%</output><button onClick={() => setZoom((value) => Math.min(10, value * 1.2))} aria-label="Zoom in">＋</button><button onClick={resetView} aria-label={t.fit}>⌗</button></div></div>
-            <div className={`drawing-board ${measureMode ? "measuring" : ""}`}><div className="grid-overlay" style={{ opacity: gridEnabled ? 1 : 0 }} /><section className="vector-toolbox" aria-label={vt.title}><div className="vector-toolbox-heading"><strong>{vt.title}</strong><span>{selectedEntityIds.length} {vt.selected}</span></div><div className="vector-category-tabs">{(Object.keys(vectorCategoryTools) as VectorCategory[]).map((category) => <button key={category} className={vectorCategory === category ? "active" : ""} onClick={() => setVectorCategory(category)}>{vt[category]}</button>)}</div><div className="vector-tool-list">{vectorCategoryTools[vectorCategory].map((tool) => <button key={tool} className={`${vectorTool === tool ? "active" : ""} ${(tool === "snap" && snapEnabled) || (tool === "ortho" && orthoEnabled) || (tool === "grid" && gridEnabled) ? "toggled" : ""}`} onClick={() => applyVectorTool(tool)} title={vt[tool]}><span>{vectorToolIcons[tool]}</span><small>{vt[tool]}</small></button>)}</div>{draftPoints.length > 0 && <div className="vector-draft-hint">{draftPoints.length} puntos · doble clic para terminar polilínea</div>}</section><svg ref={svgRef} className="cad-canvas" viewBox={`${viewX} ${viewY} ${viewWidth} ${viewHeight}`} preserveAspectRatio="xMidYMid meet" onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} onDoubleClick={() => { if (vectorTool === "polyline" && draftPoints.length >= 2) { const layer = drawing.layers.find((candidate) => !candidate.auxiliary)?.name ?? "01_ESTRUCTURAS"; const entity: Primitive = { id: newEntityId("draw"), type: "polyline", layer, color: drawing.layers.find((candidate) => candidate.name === layer)?.color, points: draftPoints }; setDrawing((current) => current ? { ...current, primitives: [...current.primitives, entity] } : current); setSelectedEntityIds([entity.id]); setDraftPoints([]); setVectorTool("select"); } }} onPointerCancel={() => { vertexDragRef.current = null; dragRef.current = null; }} onWheel={onWheel} role="img" aria-label={`${drawing.name}, ${drawing.layers.length} ${t.layers.toLowerCase()}`}>
+            <div className="canvas-toolbar"><div className="crumb"><span>{t.drawing}</span><b>/</b><strong>{drawing.name.replace(/\.[^.]+$/, "")}</strong></div><div className="view-controls"><button onClick={() => setZoom((value) => Math.max(0.65, value / 1.2))} aria-label={t.zoomOut}>−</button><output>{Math.round(zoom * 100)}%</output><button onClick={() => setZoom((value) => Math.min(10, value * 1.2))} aria-label={t.zoomIn}>＋</button><button onClick={resetView} aria-label={t.fit}>⌗</button></div></div>
+            <div className={`drawing-board ${measureMode ? "measuring" : ""}`}><div className="grid-overlay" style={{ opacity: gridEnabled ? 1 : 0 }} /><section className="vector-toolbox" aria-label={vt.title}><div className="vector-toolbox-heading"><strong>{vt.title}</strong><span>{selectedEntityIds.length} {vt.selected}</span></div><div className="vector-category-tabs">{(Object.keys(vectorCategoryTools) as VectorCategory[]).map((category) => <button key={category} className={vectorCategory === category ? "active" : ""} onClick={() => setVectorCategory(category)}>{vt[category]}</button>)}</div><div className="vector-tool-list">{vectorCategoryTools[vectorCategory].map((tool) => <button key={tool} className={`${vectorTool === tool ? "active" : ""} ${(tool === "snap" && snapEnabled) || (tool === "ortho" && orthoEnabled) || (tool === "grid" && gridEnabled) ? "toggled" : ""}`} onClick={() => applyVectorTool(tool)} title={vt[tool]}><span>{vectorToolIcons[tool]}</span><small>{vt[tool]}</small></button>)}</div>{draftPoints.length > 0 && <div className="vector-draft-hint">{draftPoints.length} {t.draftHint}</div>}</section><svg ref={svgRef} className="cad-canvas" viewBox={`${viewX} ${viewY} ${viewWidth} ${viewHeight}`} preserveAspectRatio="xMidYMid meet" onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} onDoubleClick={() => { if (vectorTool === "polyline" && draftPoints.length >= 2) { const layer = drawing.layers.find((candidate) => !candidate.auxiliary)?.name ?? "01_ESTRUCTURAS"; const entity: Primitive = { id: newEntityId("draw"), type: "polyline", layer, color: drawing.layers.find((candidate) => candidate.name === layer)?.color, points: draftPoints }; setDrawing((current) => current ? { ...current, primitives: [...current.primitives, entity] } : current); setSelectedEntityIds([entity.id]); setDraftPoints([]); setVectorTool("select"); } }} onPointerCancel={() => { vertexDragRef.current = null; dragRef.current = null; }} onWheel={onWheel} role="img" aria-label={`${drawing.name}, ${drawing.layers.length} ${t.layers.toLowerCase()}`}>
               {visiblePrimitives.map((entity) => {
                 const color = entity.color ?? drawing.layers.find((layer) => layer.name === entity.layer)?.color ?? "#ece8dd";
                 const dash = entity.lineType === "dashed" ? `${strokeWidth * 8} ${strokeWidth * 5}` : undefined;
@@ -1275,7 +1325,7 @@ export default function ArqueoCadMobile() {
               {vectorTool === "vertices" && selectedEntityIds.flatMap((id) => { const entity = visiblePrimitives.find((item) => item.id === id); return entity?.type === "polyline" && entity.points ? entity.points.map((point, index) => <circle key={`${id}-vertex-${index}`} cx={point.x} cy={sy(point.y)} r={strokeWidth * 4} fill="#11191b" stroke="#ffd166" strokeWidth={strokeWidth * 1.4} onPointerDown={(event) => { event.stopPropagation(); vertexDragRef.current = { id, index }; }} />) : []; })}
               {measurePoints.length > 0 && <polyline points={measurePoints.map((point) => `${point.x},${sy(point.y)}`).join(" ")} fill="none" stroke="#ffcc66" strokeWidth={strokeWidth * 2} strokeDasharray={`${strokeWidth * 5} ${strokeWidth * 3}`} />}
               {measurePoints.map((point, index) => <g key={`measure-${index}`}><circle cx={point.x} cy={sy(point.y)} r={strokeWidth * 5} fill="#121a1c" stroke="#ffcc66" strokeWidth={strokeWidth * 1.5} /><text x={point.x} y={sy(point.y) + strokeWidth * 1.8} textAnchor="middle" fill="#ffcc66" fontSize={strokeWidth * 6}>{index + 1}</text></g>)}
-            </svg><div className="north-arrow" aria-label="North"><span>N</span><i>↑</i></div><div className="scale-bar"><i style={{ width: `${Math.min(110, 55 * zoom)}px` }} /><span>{Math.max(1, Math.round(bounds.width / (10 * zoom)))} {drawing.unit === "metros" ? "m" : "u"}</span></div>{measureMode && <div className="measure-hint"><span>⌁</span>{t.measureHint}</div>}</div>
+            </svg><div className="north-arrow" aria-label={t.north}><span>N</span><i>↑</i></div><div className="scale-bar"><i style={{ width: `${Math.min(110, 55 * zoom)}px` }} /><span>{Math.max(1, Math.round(bounds.width / (10 * zoom)))} {drawing.unit === "metros" ? "m" : "u"}</span></div>{measureMode && <div className="measure-hint"><span>⌁</span>{t.measureHint}</div>}</div>
             <footer className="statusbar"><span><i className="status-dot" />{vectorTool === "select" ? t.ready : `${vt.ready}: ${vt[vectorTool]}`}</span><span>{cursorPoint ? `X ${cursorPoint.x.toFixed(2)} · Y ${cursorPoint.y.toFixed(2)}` : `X ${viewX.toFixed(2)} · Y ${(bounds.maxY - viewY).toFixed(2)}`}</span><span>{selectedEntityIds.length} {vt.selected} · 1:{Math.max(1, Math.round(100 / zoom))}</span></footer>
           </section>
 
