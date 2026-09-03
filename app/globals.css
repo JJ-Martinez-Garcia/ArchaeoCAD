@@ -624,6 +624,22 @@ button {
   min-width: 0;
 }
 
+.recent-project-main {
+  min-width: 0;
+  flex: 1;
+  padding: 0;
+  color: inherit;
+  text-align: left;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+.recent-project-main:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
 .recent-project strong,
 .recent-project small {
   display: block;

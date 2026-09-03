@@ -24,7 +24,7 @@ import {
 } from "./cad-core";
 import { RasterOptions, vectorizeRaster } from "./raster-vectorizer";
 
-const APP_VERSION = "v28";
+const APP_VERSION = "v29";
 
 type VectorCategory = "draw" | "modify" | "geometry" | "precision" | "organize";
 type VectorTool = "select" | "point" | "line" | "polyline" | "polygon" | "rectangle" | "circle" | "arc" | "move" | "copy" | "rotate" | "scale" | "mirror" | "offset" | "vertices" | "trim" | "extend" | "split" | "join" | "explode" | "snap" | "ortho" | "grid" | "coordinates" | "layers" | "properties" | "order";
@@ -261,6 +261,8 @@ const copy = {
     projects: "Proyectos creados",
     noProjects: "Todavía no hay proyectos guardados en este dispositivo.",
     deleteProject: "Borrar proyecto",
+    openProject: "Abrir proyecto",
+    projectUnavailable: "Este proyecto antiguo solo tiene el registro; vuelve a cargar el archivo original.",
   },
   en: {
     brandTag: "FIELD DRAWING",
@@ -396,6 +398,8 @@ const copy = {
     projects: "Created projects",
     noProjects: "No projects have been saved on this device yet.",
     deleteProject: "Delete project",
+    openProject: "Open project",
+    projectUnavailable: "This older project only has its listing; load the original file again.",
   },
   ar: {
     brandTag: "الرسم الميداني",
@@ -565,7 +569,7 @@ function browserLanguage(): Lang {
 }
 
 type RasterJob = { file: File; url: string };
-type RecentProject = { id: string; name: string; format: Drawing["format"]; entities: number; layers: number; createdAt: number };
+type RecentProject = { id: string; name: string; format: Drawing["format"]; entities: number; layers: number; createdAt: number; drawing?: Drawing };
 
 function isRaster(extension?: string) {
   return ["png", "jpg", "jpeg", "webp", "bmp"].includes(extension ?? "");
@@ -755,7 +759,7 @@ export default function ArqueoCadMobile() {
 
   function loadDrawing(next: Drawing) {
     setDrawing(next);
-    const project: RecentProject = { id: `${next.name}-${next.format}`, name: next.name, format: next.format, entities: next.primitives.length, layers: next.layers.length, createdAt: Date.now() };
+    const project: RecentProject = { id: `${next.name}-${next.format}`, name: next.name, format: next.format, entities: next.primitives.length, layers: next.layers.length, createdAt: Date.now(), drawing: next };
     setRecentProjects((current) => [project, ...current.filter((item) => item.id !== project.id)].slice(0, 8));
     setSelectedEntityIds([]);
     setDraftPoints([]);
@@ -769,6 +773,15 @@ export default function ArqueoCadMobile() {
 
   function deleteRecentProject(id: string) {
     setRecentProjects((current) => current.filter((project) => project.id !== id));
+  }
+
+  function openRecentProject(project: RecentProject) {
+    if (!project.drawing) {
+      setToast(t.projectUnavailable);
+      return;
+    }
+    loadDrawing(project.drawing);
+    setToast(`${t.ready}: ${project.name.replace(/\.[^.]+$/, "")}`);
   }
 
   function openRaster(file: File) {
@@ -1173,7 +1186,7 @@ export default function ArqueoCadMobile() {
         {!drawing ? <section className="cover-area">
           <img className="cover-image" src="/og.png" alt="ArqueoCAD Mobile, planimetría de excavación" />
           <div className="cover-scrim" />
-          <div className="cover-copy"><span className="eyebrow">{t.coverEyebrow}</span><h1>{t.coverTitle}</h1><p>{t.coverBody}</p><div className="cover-actions"><button className="primary-button" onClick={() => planInputRef.current?.click()}>＋ {t.open}</button><button className="cover-secondary" onClick={() => rasterInputRef.current?.click()}>▧ {t.vectorize}</button></div><small className="cover-formats">{t.coverFormats}</small><div className="cover-private"><span className="status-dot" />{t.privateNote}</div></div><section className="recent-projects" aria-label={t.projects}><div className="recent-projects-heading"><strong>{t.projects}</strong><span>{recentProjects.length}/8</span></div>{recentProjects.length ? <div className="recent-project-list">{recentProjects.map((project) => <article key={project.id} className="recent-project"><div><strong title={project.name}>{project.name.replace(/\.[^.]+$/, "")}</strong><small>{project.format} · {project.entities} {t.entities} · {project.layers} {t.layers.toLowerCase()}</small></div><button onClick={() => deleteRecentProject(project.id)} aria-label={`${t.deleteProject}: ${project.name}`} title={t.deleteProject}>×</button></article>)}</div> : <p className="recent-project-empty">{t.noProjects}</p>}</section>
+          <div className="cover-copy"><span className="eyebrow">{t.coverEyebrow}</span><h1>{t.coverTitle}</h1><p>{t.coverBody}</p><div className="cover-actions"><button className="primary-button" onClick={() => planInputRef.current?.click()}>＋ {t.open}</button><button className="cover-secondary" onClick={() => rasterInputRef.current?.click()}>▧ {t.vectorize}</button></div><small className="cover-formats">{t.coverFormats}</small><div className="cover-private"><span className="status-dot" />{t.privateNote}</div></div><section className="recent-projects" aria-label={t.projects}><div className="recent-projects-heading"><strong>{t.projects}</strong><span>{recentProjects.length}/8</span></div>{recentProjects.length ? <div className="recent-project-list">{recentProjects.map((project) => <article key={project.id} className="recent-project"><button className="recent-project-main" onClick={() => openRecentProject(project)} title={project.drawing ? t.openProject : t.projectUnavailable} disabled={!project.drawing}><strong title={project.name}>{project.name.replace(/\.[^.]+$/, "")}</strong><small>{project.format} · {project.entities} {t.entities} · {project.layers} {t.layers.toLowerCase()}</small></button><button onClick={() => deleteRecentProject(project.id)} aria-label={`${t.deleteProject}: ${project.name}`} title={t.deleteProject}>×</button></article>)}</div> : <p className="recent-project-empty">{t.noProjects}</p>}</section>
         </section> : <>
           <section className="canvas-area" aria-label={t.drawing}>
             <div className="canvas-toolbar"><div className="crumb"><span>{t.drawing}</span><b>/</b><strong>{drawing.name.replace(/\.[^.]+$/, "")}</strong></div><div className="view-controls"><button onClick={() => setZoom((value) => Math.max(0.65, value / 1.2))} aria-label="Zoom out">−</button><output>{Math.round(zoom * 100)}%</output><button onClick={() => setZoom((value) => Math.min(10, value * 1.2))} aria-label="Zoom in">＋</button><button onClick={resetView} aria-label={t.fit}>⌗</button></div></div>
