@@ -24,7 +24,7 @@ import {
 } from "./cad-core";
 import { RasterOptions, vectorizeRaster } from "./raster-vectorizer";
 
-const APP_VERSION = "v31";
+const APP_VERSION = "v32";
 
 type VectorCategory = "draw" | "modify" | "geometry" | "precision" | "organize";
 type VectorTool = "select" | "point" | "line" | "polyline" | "polygon" | "rectangle" | "circle" | "arc" | "move" | "copy" | "rotate" | "scale" | "mirror" | "offset" | "vertices" | "trim" | "extend" | "split" | "join" | "explode" | "snap" | "ortho" | "grid" | "coordinates" | "layers" | "properties" | "order";
@@ -795,6 +795,15 @@ export default function ArqueoCadMobile() {
     setToast(`${t.ready}: ${next.layers.length} ${t.layers.toLowerCase()}`);
   }
 
+  function goToCover() {
+    setDrawing(null);
+    setActivePanel(null);
+    setSelectedEntityIds([]);
+    setDraftPoints([]);
+    setMeasurePoints([]);
+    setMeasureMode(false);
+  }
+
   function deleteRecentProject(id: string) {
     setRecentProjects((current) => current.filter((project) => project.id !== id));
   }
@@ -1217,7 +1226,7 @@ export default function ArqueoCadMobile() {
       <input ref={rasterInputRef} className="sr-only" type="file" accept="image/png,image/jpeg,image/webp,image/bmp" onChange={onRasterInput} />
 
       <header className="topbar">
-        <div className="brand-block"><div className="brand-mark" aria-hidden="true"><span>A</span></div><div><strong>ArchaeoCAD</strong><small>{t.brandTag} · {APP_VERSION}</small></div></div>
+        <button className="brand-block brand-home" onClick={goToCover} aria-label="ArchaeoCAD — portada"><div className="brand-mark" aria-hidden="true"><span>A</span></div><div><strong>ArchaeoCAD</strong><small>{t.brandTag} · {APP_VERSION}</small></div></button>
         <div className="file-summary" title={drawing?.name ?? t.noDrawing}>
           <span className="format-badge">{drawing ? (drawing.format === "RASTER" ? "IMG" : drawing.format) : "—"}</span>
           <div><strong>{drawing?.name ?? t.noDrawing}</strong><small>{drawing ? `${drawing.primitives.length.toLocaleString(lang)} ${t.entities} · ${drawing.layers.length} ${t.layers.toLowerCase()} · ${drawing.unit}` : t.noDrawingMeta}</small></div>
@@ -1245,9 +1254,8 @@ export default function ArqueoCadMobile() {
         </nav>
 
         {!drawing ? <section className="cover-area">
-          <img className="cover-image" src="/og.png" alt="ArchaeoCAD Mobile, planimetría de excavación" />
-          <div className="cover-scrim" />
-          <div className="cover-copy"><span className="eyebrow">{t.coverEyebrow}</span><h1>{t.coverTitle}</h1><p>{t.coverBody}</p><div className="cover-actions"><button className="primary-button" onClick={() => planInputRef.current?.click()}>＋ {t.open}</button><button className="cover-secondary" onClick={() => rasterInputRef.current?.click()}>▧ {t.vectorize}</button></div><small className="cover-formats">{t.coverFormats}</small><div className="cover-private"><span className="status-dot" />{t.privateNote}</div></div><section className="recent-projects" aria-label={t.projects}><div className="recent-projects-heading"><strong>{t.projects}</strong><span>{recentProjects.length}/8</span></div>{recentProjects.length ? <div className="recent-project-list">{recentProjects.map((project) => <article key={project.id} className="recent-project"><button className="recent-project-main" onClick={() => openRecentProject(project)} title={project.drawing ? t.openProject : t.projectUnavailable} disabled={!project.drawing}><strong title={project.name}>{project.name.replace(/\.[^.]+$/, "")}</strong><small>{project.format} · {project.entities} {t.entities} · {project.layers} {t.layers.toLowerCase()}</small></button><button onClick={() => deleteRecentProject(project.id)} aria-label={`${t.deleteProject}: ${project.name}`} title={t.deleteProject}>×</button></article>)}</div> : <p className="recent-project-empty">{t.noProjects}</p>}</section>
+          <div className="cover-hero"><img className="cover-image" src="/og.png" alt="ArchaeoCAD Mobile, planimetría de excavación" /><div className="cover-scrim" /><div className="cover-copy"><span className="eyebrow">{t.coverEyebrow}</span><h1>{t.coverTitle}</h1><p>{t.coverBody}</p><div className="cover-actions"><button className="primary-button" onClick={() => planInputRef.current?.click()}>＋ {t.open}</button><button className="cover-secondary" onClick={() => rasterInputRef.current?.click()}>▧ {t.vectorize}</button></div><small className="cover-formats">{t.coverFormats}</small><div className="cover-private"><span className="status-dot" />{t.privateNote}</div></div></div>
+          <section className="recent-projects" aria-label={t.projects}><div className="recent-projects-heading"><strong>{t.projects}</strong><span>{recentProjects.length}/8</span></div>{recentProjects.length ? <div className="recent-project-list">{recentProjects.map((project) => <article key={project.id} className="recent-project"><button className="recent-project-main" onClick={() => openRecentProject(project)} title={project.drawing ? t.openProject : t.projectUnavailable} disabled={!project.drawing}><strong title={project.name}>{project.name.replace(/\.[^.]+$/, "")}</strong><small>{project.format} · {project.entities} {t.entities} · {project.layers} {t.layers.toLowerCase()}</small></button><button onClick={() => deleteRecentProject(project.id)} aria-label={`${t.deleteProject}: ${project.name}`} title={t.deleteProject}>×</button></article>)}</div> : <p className="recent-project-empty">{t.noProjects}</p>}</section>
         </section> : <>
           <section className="canvas-area" aria-label={t.drawing}>
             <div className="canvas-toolbar"><div className="crumb"><span>{t.drawing}</span><b>/</b><strong>{drawing.name.replace(/\.[^.]+$/, "")}</strong></div><div className="view-controls"><button onClick={() => setZoom((value) => Math.max(0.65, value / 1.2))} aria-label="Zoom out">−</button><output>{Math.round(zoom * 100)}%</output><button onClick={() => setZoom((value) => Math.min(10, value * 1.2))} aria-label="Zoom in">＋</button><button onClick={resetView} aria-label={t.fit}>⌗</button></div></div>
