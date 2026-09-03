@@ -24,7 +24,7 @@ import {
 } from "./cad-core";
 import { RasterOptions, vectorizeRaster } from "./raster-vectorizer";
 
-const APP_VERSION = "v29";
+const APP_VERSION = "v30";
 
 type VectorCategory = "draw" | "modify" | "geometry" | "precision" | "organize";
 type VectorTool = "select" | "point" | "line" | "polyline" | "polygon" | "rectangle" | "circle" | "arc" | "move" | "copy" | "rotate" | "scale" | "mirror" | "offset" | "vertices" | "trim" | "extend" | "split" | "join" | "explode" | "snap" | "ortho" | "grid" | "coordinates" | "layers" | "properties" | "order";
@@ -125,6 +125,15 @@ type InstallPromptEvent = Event & {
   prompt: () => Promise<void>;
   userChoice: Promise<{ outcome: "accepted" | "dismissed" }>;
 };
+
+type DeviceFileHandle = { createWritable: () => Promise<{ write: (value: string) => Promise<void>; close: () => Promise<void> }> };
+type DeviceDirectoryHandle = { getFileHandle: (name: string, options?: { create?: boolean }) => Promise<DeviceFileHandle> };
+
+declare global {
+  interface Window {
+    showDirectoryPicker?: (options?: { mode?: "readwrite" }) => Promise<DeviceDirectoryHandle>;
+  }
+}
 
 const copy = {
   es: {
@@ -263,6 +272,11 @@ const copy = {
     deleteProject: "Borrar proyecto",
     openProject: "Abrir proyecto",
     projectUnavailable: "Este proyecto antiguo solo tiene el registro; vuelve a cargar el archivo original.",
+    saveProject: "Guardar proyecto",
+    saveProjectFolder: "Guardar en carpeta",
+    savedProject: "Proyecto guardado en el dispositivo",
+    saveCancelled: "Guardado cancelado",
+    switchProject: "Cambiar proyecto",
   },
   en: {
     brandTag: "FIELD DRAWING",
@@ -400,6 +414,11 @@ const copy = {
     deleteProject: "Delete project",
     openProject: "Open project",
     projectUnavailable: "This older project only has its listing; load the original file again.",
+    saveProject: "Save project",
+    saveProjectFolder: "Save to folder",
+    savedProject: "Project saved on this device",
+    saveCancelled: "Save cancelled",
+    switchProject: "Switch project",
   },
   ar: {
     brandTag: "الرسم الميداني",
@@ -703,7 +722,11 @@ export default function ArqueoCadMobile() {
   }, [lang]);
 
   useEffect(() => {
-    window.localStorage.setItem("arqueocad-projects", JSON.stringify(recentProjects));
+    try {
+      window.localStorage.setItem("arqueocad-projects", JSON.stringify(recentProjects));
+    } catch {
+      // A very large drawing can exceed localStorage; keep the current session usable.
+    }
   }, [recentProjects]);
 
   useEffect(() => {
@@ -1126,6 +1149,40 @@ export default function ArqueoCadMobile() {
     setZoom((current) => Math.min(10, Math.max(0.65, current * (event.deltaY > 0 ? 0.9 : 1.1))));
   }
 
+  async function saveProjectToDevice() {
+    if (!drawing) return;
+    const stem = safeName(drawing.name.replace(/\.[^.]+$/, "")) || "arqueocad-proyecto";
+    const dxf = toDxf(drawing.primitives, drawing.unit);
+    const svg = toSvg(drawing.primitives, drawing.name);
+    try {
+      if (window.showDirectoryPicker) {
+        const directory = await window.showDirectoryPicker({ mode: "readwrite" });
+        const dxfHandle = await directory.getFileHandle(`${stem}.dxf`, { create: true });
+        const dxfWriter = await dxfHandle.createWritable();
+        await dxfWriter.write(dxf);
+        await dxfWriter.close();
+        const svgHandle = await directory.getFileHandle(`${stem}.svg`, { create: true });
+        const svgWriter = await svgHandle.createWritable();
+        await svgWriter.write(svg);
+        await svgWriter.close();
+        setToast(`${t.savedProject}: ${stem}`);
+        return;
+      }
+      // Safari/iOS and older Android WebViews do not expose directory access.
+      // Keep the workflow useful by downloading an editable DXF instead.
+      const blob = new Blob([dxf], { type: "application/dxf" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `${stem}.dxf`;
+      link.click();
+      window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+      setToast(`${t.savedProject}: ${stem}.dxf`);
+    } catch (error) {
+      if ((error as DOMException)?.name !== "AbortError") setToast(t.saveCancelled);
+    }
+  }
+
   function createExport() {
     if (!drawing) return;
     const chosenLayers = drawing.layers.filter((layer) => layer.selected && !layer.auxiliary);
@@ -1166,6 +1223,8 @@ export default function ArqueoCadMobile() {
         </div>
         <div className="top-actions">
           <span className="privacy-note"><span className="status-dot" />{t.local}</span>
+          {drawing && <label className="project-switcher-wrap"><span>{t.switchProject}</span><select className="project-switcher" value={`${drawing.name}-${drawing.format}`} onChange={(event) => { const project = recentProjects.find((item) => item.id === event.target.value); if (project) openRecentProject(project); }} aria-label={t.switchProject}>{recentProjects.filter((project) => project.drawing).map((project) => <option key={project.id} value={project.id}>{project.name.replace(/\.[^.]+$/, "")}</option>)}</select></label>}
+          {drawing && <button className="save-project-trigger" onClick={() => void saveProjectToDevice()} aria-label={t.saveProject}><span aria-hidden="true">⇩</span><b>{t.saveProject}</b></button>}
           {!installed && <button className="install-trigger" onClick={() => setInstallOpen(true)} aria-label={t.install}><span aria-hidden="true">⇩</span><b>{t.install}</b></button>}
           <label className="language-select-wrap"><span>{t.chooseLanguage}</span><select className="language-select" value={lang} onChange={(event) => setLang(event.target.value as Lang)} aria-label={t.chooseLanguage}>{languageOptions.map((option) => <option key={option.code} value={option.code}>{option.code.toUpperCase()} — {option.label}</option>)}</select></label>
           <button className="help-trigger" onClick={() => setHelpOpen(true)} aria-label={t.help} title={t.help}>?</button>
@@ -1176,6 +1235,7 @@ export default function ArqueoCadMobile() {
         <nav className="tool-rail" aria-label={t.mobileTools}>
           <button onClick={() => planInputRef.current?.click()}><span className="tool-glyph">＋</span><small>{t.openShort}</small></button>
           <button onClick={() => rasterInputRef.current?.click()}><span className="tool-glyph">▧</span><small>{t.vectorizeShort}</small></button>
+          <button disabled={!drawing} onClick={() => void saveProjectToDevice()}><span className="tool-glyph">⇩</span><small>{t.saveProject}</small></button>
           <button disabled={!drawing} className={activePanel === "layers" ? "active" : ""} onClick={() => setActivePanel(activePanel === "layers" ? null : "layers")}><span className="tool-glyph layers-glyph">▤</span><small>{t.layers}</small></button>
           <button disabled={!drawing} className={measureMode ? "active" : ""} onClick={() => { setMeasureMode((current) => !current); setActivePanel(null); }}><span className="tool-glyph">⌁</span><small>{t.measure}</small></button>
           <button disabled={!drawing} className={activePanel === "warnings" ? "active" : ""} onClick={() => setActivePanel(activePanel === "warnings" ? null : "warnings")}><span className="tool-glyph warning-glyph">!</span><small>{t.warnings}</small>{Boolean(drawing?.warnings.length) && <span className="notification-count">{drawing?.warnings.length}</span>}</button>
@@ -1220,7 +1280,7 @@ export default function ArqueoCadMobile() {
 
       <footer className="license-footer"><span>{t.footerText}</span><strong><a href="http://josejaviermartinez.com/digital-laboratory/" target="_blank" rel="noreferrer">Laboratorio Digital</a></strong><small className="app-version-footer">{APP_VERSION}</small></footer>
 
-      <nav className="mobile-nav" aria-label={t.mobileTools}><button onClick={() => planInputRef.current?.click()}><span>＋</span>{t.openShort}</button><button onClick={() => rasterInputRef.current?.click()}><span>▧</span>{t.vectorizeShort}</button><button disabled={!drawing} className={activePanel === "layers" ? "active" : ""} onClick={() => setActivePanel(activePanel === "layers" ? null : "layers")}><span>▤</span>{t.layers}</button><button disabled={!drawing} className={measureMode ? "measure-fab active" : "measure-fab"} onClick={() => { setMeasureMode((value) => !value); setActivePanel(null); }}><span>⌁</span>{t.measure}</button><button disabled={!drawing} onClick={() => setActivePanel(activePanel === "warnings" ? null : "warnings")}><span>!</span>{t.warnings}</button><button disabled={!drawing} onClick={() => setExportOpen(true)}><span>⇩</span>{t.export}</button></nav>
+      <nav className="mobile-nav" aria-label={t.mobileTools}><button onClick={() => planInputRef.current?.click()}><span>＋</span>{t.openShort}</button><button onClick={() => rasterInputRef.current?.click()}><span>▧</span>{t.vectorizeShort}</button><button disabled={!drawing} onClick={() => void saveProjectToDevice()}><span>⇩</span>{t.saveProject}</button><button disabled={!drawing} className={activePanel === "layers" ? "active" : ""} onClick={() => setActivePanel(activePanel === "layers" ? null : "layers")}><span>▤</span>{t.layers}</button><button disabled={!drawing} className={measureMode ? "measure-fab active" : "measure-fab"} onClick={() => { setMeasureMode((value) => !value); setActivePanel(null); }}><span>⌁</span>{t.measure}</button><button disabled={!drawing} onClick={() => setActivePanel(activePanel === "warnings" ? null : "warnings")}><span>!</span>{t.warnings}</button><button disabled={!drawing} onClick={() => setExportOpen(true)}><span>⇩</span>{t.export}</button></nav>
 
       {drawing && measureMode && measurePoints.length > 0 && <section className="measurement-card"><div><span>{t.length}</span><strong>{metrics.length.toFixed(2)} {drawing.unit === "metros" ? "m" : "u"}</strong></div>{measurePoints.length > 2 && <><div><span>{t.area}</span><strong>{metrics.area.toFixed(2)} {drawing.unit === "metros" ? "m²" : "u²"}</strong></div><div><span>{t.perimeter}</span><strong>{metrics.perimeter.toFixed(2)} {drawing.unit === "metros" ? "m" : "u"}</strong></div></>}{measurePoints.length > 1 && <div><span>{t.azimuth}</span><strong>{metrics.azimuth.toFixed(1)}°</strong></div>}<button onClick={() => setMeasurePoints((points) => points.slice(0, -1))}>{t.undo}</button><button onClick={() => setMeasurePoints([])}>{t.clear}</button></section>}
 

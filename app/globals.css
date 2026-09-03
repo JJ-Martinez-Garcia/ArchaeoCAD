@@ -326,6 +326,44 @@ button {
   text-transform: uppercase;
 }
 
+.save-project-trigger,
+.project-switcher-wrap {
+  display: flex;
+  align-items: center;
+}
+
+.save-project-trigger {
+  min-height: 34px;
+  gap: 6px;
+  padding: 0 10px;
+  color: #1b1b17;
+  background: #d6a34b;
+  border: 1px solid #e8bd6c;
+  cursor: pointer;
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.save-project-trigger:hover {
+  background: #f1c568;
+}
+
+.project-switcher-wrap {
+  gap: 6px;
+  color: #82908c;
+  font-size: 9px;
+}
+
+.project-switcher {
+  max-width: 160px;
+  min-height: 32px;
+  padding: 0 7px;
+  color: #d7ded9;
+  background: #172022;
+  border: 1px solid #3d4a4b;
+  font-size: 10px;
+}
+
 .install-trigger span {
   font-size: 14px;
 }
@@ -2265,6 +2303,21 @@ input:checked + .custom-check {
   .file-summary,
   .top-actions .primary-button {
     display: none;
+  }
+
+  .top-actions .save-project-trigger b,
+  .project-switcher-wrap > span {
+    display: none;
+  }
+
+  .save-project-trigger {
+    width: 34px;
+    padding: 0;
+    justify-content: center;
+  }
+
+  .project-switcher {
+    max-width: 125px;
   }
 
   .install-trigger {
