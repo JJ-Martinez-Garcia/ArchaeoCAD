@@ -768,7 +768,7 @@ export default function ArqueoCadMobile() {
       <header className="topbar">
         <div className="brand-block">
           <div className="brand-mark" aria-hidden="true"><span>A</span></div>
-          <div><strong>ArqueoCAD</strong><small>FIELD DRAWING</small></div>
+          <div><strong>ArchaeoCAD</strong><small>FIELD DRAWING</small></div>
         </div>
         <div className="file-summary" title={drawing.name}>
           <span className="format-badge">{drawing.format === "DEMO" ? "DXF" : drawing.format}</span>

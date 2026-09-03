@@ -9,14 +9,14 @@ export async function generateMetadata(): Promise<Metadata> {
   const origin = `${protocol}://${host}`;
   return {
     metadataBase: new URL(origin),
-    title: "ArqueoCAD Mobile · Planimetría de excavación",
+    title: "ArchaeoCAD Mobile · Planimetría de excavación",
     description: "Abre, revisa, mide y separa las capas de planos DXF y SVG desde el móvil. El procesamiento se realiza en tu dispositivo.",
-    applicationName: "ArqueoCAD Mobile",
+    applicationName: "ArchaeoCAD Mobile",
     manifest: "/manifest.webmanifest",
     appleWebApp: {
       capable: true,
       statusBarStyle: "black-translucent",
-      title: "ArqueoCAD",
+      title: "ArchaeoCAD",
     },
     icons: {
       icon: "/favicon.svg",
@@ -25,13 +25,13 @@ export async function generateMetadata(): Promise<Metadata> {
     },
     openGraph: {
       type: "website",
-      title: "ArqueoCAD Mobile",
+      title: "ArchaeoCAD Mobile",
       description: "Planimetría de excavación, en el terreno.",
-      images: [{ url: `${origin}/og.png`, width: 1750, height: 907, alt: "ArqueoCAD Mobile, planimetría de excavación en el terreno" }],
+      images: [{ url: `${origin}/og.png`, width: 1750, height: 907, alt: "ArchaeoCAD Mobile, planimetría de excavación en el terreno" }],
     },
     twitter: {
       card: "summary_large_image",
-      title: "ArqueoCAD Mobile",
+      title: "ArchaeoCAD Mobile",
       description: "Planimetría de excavación, en el terreno.",
       images: [`${origin}/og.png`],
     },
@@ -54,7 +54,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
         <meta name="mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-        <meta name="apple-mobile-web-app-title" content="ArqueoCAD" />
+        <meta name="apple-mobile-web-app-title" content="ArchaeoCAD" />
         <link rel="apple-touch-icon" sizes="192x192" href="/apple-touch-icon.png" />
       </head>
       <body>{children}</body>

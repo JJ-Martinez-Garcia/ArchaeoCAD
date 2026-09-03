@@ -4,7 +4,7 @@ import test from "node:test";
 
 const root = new URL("../", import.meta.url);
 
-test("ships ArqueoCAD as a multilingual installable mobile application", async () => {
+test("ships ArchaeoCAD as a multilingual installable mobile application", async () => {
   const [page, vectorizer, layout, manifest, serviceWorker] = await Promise.all([
     readFile(new URL("app/page.tsx", root), "utf8"),
     readFile(new URL("app/raster-vectorizer.ts", root), "utf8"),
@@ -13,7 +13,7 @@ test("ships ArqueoCAD as a multilingual installable mobile application", async (
     readFile(new URL("public/sw.js", root), "utf8"),
   ]);
 
-  assert.match(page, /ArqueoCAD/);
+  assert.match(page, /ArchaeoCAD/);
   assert.match(page, /accept="\.dxf,\.dwg,\.svg"/);
   assert.match(page, /makeZip/);
   assert.match(page, /measurePoints/);
@@ -24,7 +24,7 @@ test("ships ArqueoCAD as a multilingual installable mobile application", async (
   assert.match(page, /image\/png,image\/jpeg,image\/webp,image\/bmp/);
   assert.match(page, /Este es un software gratuito y de libre distribución creado por José Javier Martínez/);
   assert.match(page, /http:\/\/josejaviermartinez\.com\/digital-laboratory\//);
-  assert.match(page, /const APP_VERSION = "v30"/);
+  assert.match(page, /const APP_VERSION = "v31"/);
   assert.match(page, /className="language-select"/);
   assert.match(page, /code: "fr", label: "Français"/);
   assert.match(page, /code: "zh", label: "中文"/);
@@ -68,7 +68,7 @@ test("ships ArqueoCAD as a multilingual installable mobile application", async (
   assert.match(vectorizer, /04_EJES_SECCIONES/);
   assert.match(vectorizer, /scaleBarLength/);
   assert.match(vectorizer, /must never be eroded/);
-  assert.match(layout, /ArqueoCAD Mobile/);
+  assert.match(layout, /ArchaeoCAD Mobile/);
   assert.match(layout, /apple-mobile-web-app-capable/);
   assert.match(layout, /apple-touch-icon\.png/);
   assert.doesNotMatch(layout, /codex-preview|Starter Project/);

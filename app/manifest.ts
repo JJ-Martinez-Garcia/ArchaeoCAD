@@ -2,8 +2,8 @@ import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "ArqueoCAD Mobile",
-    short_name: "ArqueoCAD",
+    name: "ArchaeoCAD Mobile",
+    short_name: "ArchaeoCAD",
     description: "Planimetría arqueológica: visor, capas, medición y exportación DXF/SVG.",
     id: "/",
     start_url: "/",
