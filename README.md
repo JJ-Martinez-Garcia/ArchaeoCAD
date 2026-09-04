@@ -1,6 +1,6 @@
-# ArqueoCAD Mobile
+# ArchaeoCAD
 
-Versión web móvil de [ArqueoCAD](https://github.com/JJ-Martinez-Garcia/ArqueoCAD), orientada al trabajo de campo arqueológico.
+Aplicación web de [ArchaeoCAD](https://github.com/JJ-Martinez-Garcia/ArchaeoCAD), orientada al trabajo de campo arqueológico.
 
 ## Sitio web y aplicación
 
