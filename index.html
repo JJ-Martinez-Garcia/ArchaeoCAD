@@ -11,5 +11,9 @@
     <script type="module" crossorigin src="./assets/index-CKml9gF2.js"></script>
     <link rel="stylesheet" crossorigin href="./assets/index-eOUaQW12.css">
   </head>
-  <body><div id="root"></div></body>
+  <body><div id="root"></div><script>
+    window.addEventListener("error", (event) => { document.body.innerHTML = `<pre style="padding:2rem;color:#ffb08d;white-space:pre-wrap">ArchaeoCAD no pudo iniciar: ${event.message}</pre>`; });
+    window.addEventListener("unhandledrejection", (event) => { document.body.innerHTML = `<pre style="padding:2rem;color:#ffb08d;white-space:pre-wrap">ArchaeoCAD no pudo iniciar: ${event.reason}</pre>`; });
+  </script></body>
 </html>
+
