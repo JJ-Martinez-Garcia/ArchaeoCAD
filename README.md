@@ -20,6 +20,20 @@ Versión web móvil de [ArqueoCAD](https://github.com/JJ-Martinez-Garcia/ArqueoC
 
 DWG puede convertirse directamente a DXF en el navegador mediante [LibreDWG Web](https://github.com/mlightcad/libredwg-web) (GPL-3.0), cargado bajo demanda desde su distribución WASM. También se ofrece ODA File Converter como alternativa para archivos incompatibles.
 
+## Módulos CAD y hoja de ruta integrada
+
+1. **Vectorización raster**: normalización de contraste, máscaras cromáticas independientes, trazado por componentes y curvas suavizadas.
+2. **Edición 2D**: punto, línea, polilínea, polígono, círculo, arco, mover, copiar, rotar, escalar, espejo, offset, partir, unir y explotar.
+3. **Clasificación**: capas de estructuras, curvas, ejes, tramas, símbolos, textos, escala/norte y marco, con revisión manual y confianza.
+4. **Intercambio CAD**: DXF/SVG nativos y conversión DWG local mediante LibreDWG Web.
+5. **Vista 3D**: extrusión experimental de polígonos cerrados para inspección rápida.
+6. **Biblioteca arqueológica**: símbolos paramétricos editables inspirados en FreeCAD-library.
+7. **OCR**: etiquetas y cotas editables en su propia capa.
+8. **Rendimiento móvil**: límites de resolución y recorrido para mantener la PWA receptiva en WebViews.
+9. **Control de calidad**: avisos de trazos abiertos, entidades diminutas, duplicados y baja confianza.
+
+Las funciones de terceros se mantienen separadas por módulos para respetar sus licencias: React/Vite (MIT), VTracer (MIT), Trazor (MIT), ImageTracerJS (BSD-2-Clause si se incorpora) y LibreDWG (GPL-3.0). Debe conservarse el texto de licencia de cada dependencia al distribuir una compilación.
+
 ## Desarrollo
 
 Requiere Node.js 22 o posterior.
