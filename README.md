@@ -18,7 +18,7 @@ Versión web móvil de [ArqueoCAD](https://github.com/JJ-Martinez-Garcia/ArqueoC
 - Procesa los planos localmente: los archivos no se suben a un servidor.
 - Incluye una interfaz completa en español e inglés seleccionable desde la cabecera.
 
-DWG sigue necesitando una conversión previa a DXF mediante ODA File Converter. La aplicación detecta el formato y abre el puente de conversión; una compilación LibreDWG-WASM completa requiere un backend específico para cada plataforma.
+DWG puede convertirse directamente a DXF en el navegador mediante [LibreDWG Web](https://github.com/mlightcad/libredwg-web) (GPL-3.0), cargado bajo demanda desde su distribución WASM. También se ofrece ODA File Converter como alternativa para archivos incompatibles.
 
 ## Desarrollo
 
