@@ -1,4 +1,4 @@
-const CACHE_NAME = "archaeocad-mobile-v36";
+const CACHE_NAME = "archaeocad-mobile-v41";
 const APP_SHELL = ["/", "/manifest.webmanifest", "/favicon.svg", "/icon-192.png", "/icon-512.png", "/apple-touch-icon.png"];
 
 self.addEventListener("install", (event) => {
@@ -25,3 +25,4 @@ self.addEventListener("fetch", (event) => {
       .catch(() => caches.match(event.request).then((cached) => cached || caches.match("/"))),
   );
 });
+
