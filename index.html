@@ -8,7 +8,7 @@
     <link rel="manifest" href="./manifest.webmanifest" />
     <link rel="icon" href="./favicon.svg" />
     <title>ArchaeoCAD Mobile</title>
-    <script type="module">\n      (async () => {\n        try {\n          const regs = await navigator.serviceWorker?.getRegistrations?.() || [];\n          await Promise.all(regs.map((registration) => registration.unregister()));\n          const keys = await caches?.keys?.() || [];\n          await Promise.all(keys.map((key) => caches.delete(key)));\n        } catch (_) {}\n        await import("./assets/index-CKml9gF2.js?fresh=1");\n      })();\n    </script>
+    <script type="module" crossorigin src="./assets/index-CKml9gF2.js"></script>
     <link rel="stylesheet" crossorigin href="./assets/index-eOUaQW12.css">
   </head>
   <body><div id="root"></div><script>
