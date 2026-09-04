@@ -12,7 +12,7 @@
     <link rel="stylesheet" crossorigin href="./assets/index-eOUaQW12.css">
   </head>
   <body><div id="root"></div><script>
-    window.addEventListener("error", (event) => { document.body.innerHTML = `<pre style="padding:2rem;color:#ffb08d;white-space:pre-wrap">ArchaeoCAD no pudo iniciar: ${event.message}</pre>`; });
+    window.addEventListener("error", (event) => { document.body.innerHTML = `<pre style="padding:2rem;color:#ffb08d;white-space:pre-wrap">ArchaeoCAD no pudo iniciar: ${event.message} (${event.filename||'inline'}:${event.lineno||''})</pre>`; });
     window.addEventListener("unhandledrejection", (event) => { document.body.innerHTML = `<pre style="padding:2rem;color:#ffb08d;white-space:pre-wrap">ArchaeoCAD no pudo iniciar: ${event.reason}</pre>`; });
   </script></body>
 </html>
