@@ -2,6 +2,14 @@
 
 Versión web móvil de [ArqueoCAD](https://github.com/JJ-Martinez-Garcia/ArqueoCAD), orientada al trabajo de campo arqueológico.
 
+## Sitio web y aplicación
+
+La aplicación PWA está disponible en:
+
+**[https://jj-martinez-garcia.github.io/ArchaeoCAD/](https://jj-martinez-garcia.github.io/ArchaeoCAD/)**
+
+Puede abrirse desde un navegador de escritorio o móvil y permite instalarse como aplicación cuando el navegador es compatible.
+
 ## Funciones
 
 - Abre planos DXF y SVG directamente en el navegador.
@@ -44,5 +52,18 @@ npm run dev
 npm run build
 ```
 
-La aplicación se distribuye bajo los mismos términos GPL-3.0 del proyecto original.
+## Derechos y licencias
+
+Copyright © José Javier Martínez García. ArchaeoCAD se distribuye como software libre bajo los términos de la **GNU General Public License v3.0 (GPL-3.0)**, conforme al proyecto original. Consulta el texto completo en [LICENSE](https://www.gnu.org/licenses/gpl-3.0.html).
+
+Los créditos y avisos de terceros deben conservarse al redistribuir una compilación:
+
+- [React](https://github.com/facebook/react): MIT.
+- [Vite](https://github.com/vitejs/vite): MIT.
+- [VTracer](https://github.com/visioncortex/vtracer): MIT.
+- [Tesseract.js](https://github.com/naptha/tesseract.js): Apache-2.0.
+- [LibreDWG](https://github.com/LibreDWG/libredwg) y su puente web: GPL-3.0.
+- [OpenCascade/CadQuery](https://github.com/CadQuery/cadquery): LGPL-3.0 y Apache-2.0 según el componente utilizado.
+
+La aplicación procesa los archivos localmente en el dispositivo; no se envían planos a un servidor de ArchaeoCAD. Las licencias de cada dependencia prevalecen sobre esta nota cuando se distribuyen sus propios componentes.
 
