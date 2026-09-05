@@ -64,6 +64,8 @@ Los créditos y avisos de terceros deben conservarse al redistribuir una compila
 - [Tesseract.js](https://github.com/naptha/tesseract.js): Apache-2.0.
 - [LibreDWG](https://github.com/LibreDWG/libredwg) y su puente web: GPL-3.0.
 - [OpenCascade/CadQuery](https://github.com/CadQuery/cadquery): LGPL-3.0 y Apache-2.0 según el componente utilizado.
+- [Paper.js](https://github.com/paperjs/paper.js), [perfect-freehand](https://github.com/steveruizok/perfect-freehand), [flatten-js](https://github.com/alexbol99/flatten-js) e [iShape-js](https://github.com/iShape-Rust/iShape-js): MIT.
+- [opentype.js](https://github.com/opentypejs/opentype.js): MIT; [earcut](https://github.com/mapbox/earcut): ISC.
 
 La aplicación procesa los archivos localmente en el dispositivo; no se envían planos a un servidor de ArchaeoCAD. Las licencias de cada dependencia prevalecen sobre esta nota cuando se distribuyen sus propios componentes.
 
