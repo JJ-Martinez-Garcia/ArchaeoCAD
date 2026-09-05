@@ -54,7 +54,7 @@ npm run build
 
 ## Derechos y licencias
 
-Copyright © José Javier Martínez García. ArchaeoCAD se distribuye como software libre bajo los términos de la **GNU General Public License v3.0 (GPL-3.0)**, conforme al proyecto original. Consulta el texto completo en [LICENSE](https://www.gnu.org/licenses/gpl-3.0.html).
+Copyright © José Javier Martínez García. ArchaeoCAD se distribuye como software libre bajo los términos de la **GNU General Public License v3.0 (GPL-3.0)**, conforme al proyecto original. Consulta el aviso de licencia del repositorio en [LICENSE](./LICENSE) y el texto completo en [gnu.org](https://www.gnu.org/licenses/gpl-3.0.html).
 
 Los créditos y avisos de terceros deben conservarse al redistribuir una compilación:
 
