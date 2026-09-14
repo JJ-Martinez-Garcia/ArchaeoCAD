@@ -40,3 +40,10 @@ yarn-error.log*
 /work/
 /.source/
 /.pnpm-store/
+
+# Tauri / native build output
+/src-tauri/target/
+/src-tauri/gen/
+/release/
+*.keystore
+*.jks

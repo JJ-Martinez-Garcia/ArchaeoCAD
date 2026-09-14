@@ -26,6 +26,8 @@ export type Primitive = {
   confidence?: number;
   lineType?: "continuous" | "dashed";
   lineWeight?: number;
+  /** Export the vertex chain as a native DXF SPLINE when possible. */
+  smooth?: boolean;
 };
 export type Layer = {
   name: string;
@@ -540,8 +542,15 @@ export function toDxf(primitives: Primitive[], unit: string) {
   primitives.forEach((entity) => {
     const common: (string | number)[] = [8, entity.layer, 6, entity.lineType === "dashed" ? "DASHED_ARCH" : "BYLAYER", 370, entity.lineWeight ?? -1];
     if (entity.type === "polyline" && entity.points?.length) {
-      add(0, "LWPOLYLINE", ...common, 90, entity.points.length, 70, entity.closed ? 1 : 0);
-      entity.points.forEach((point) => add(10, point.x, 20, point.y));
+      if (entity.smooth && entity.points.length >= 4) {
+        // Degree-3 fit through the sampled centreline. Consumers that do not
+        // support SPLINE can still use the same points from the SVG export.
+        add(0, "SPLINE", ...common, 70, entity.closed ? 1 : 0, 71, 3, 72, entity.points.length, 73, 0);
+        entity.points.forEach((point) => add(11, point.x, 21, point.y, 31, 0));
+      } else {
+        add(0, "LWPOLYLINE", ...common, 90, entity.points.length, 70, entity.closed ? 1 : 0);
+        entity.points.forEach((point) => add(10, point.x, 20, point.y));
+      }
     } else if (entity.type === "circle" && entity.center) add(0, "CIRCLE", ...common, 10, entity.center.x, 20, entity.center.y, 40, entity.radius ?? 1);
     else if (entity.type === "point" && entity.center) add(0, "POINT", ...common, 10, entity.center.x, 20, entity.center.y);
     else if (entity.type === "text" && entity.center) add(0, "TEXT", ...common, 10, entity.center.x, 20, entity.center.y, 40, entity.height ?? 1, 1, entity.text ?? "");

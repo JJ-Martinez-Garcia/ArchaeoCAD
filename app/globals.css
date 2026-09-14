@@ -2832,3 +2832,14 @@ input:checked + .custom-check {
     transition-duration: 0.01ms !important;
   }
 }
+
+.symbol-modal { max-width: 760px; }
+.symbol-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-top: 18px; }
+.symbol-card { display: grid; gap: 7px; padding: 12px; text-align: left; color: var(--ink); background: rgba(255,255,255,.55); border: 1px solid var(--line); cursor: pointer; }
+.symbol-card:hover { border-color: var(--accent); transform: translateY(-2px); }
+.symbol-card svg { width: 100%; height: 64px; color: var(--accent); background: #142022; }
+.symbol-card strong { font-size: 13px; }
+.symbol-card small { color: var(--muted); font-size: 11px; line-height: 1.3; }
+.view3d-modal { max-width: 760px; }
+.solid-preview { display: block; width: 100%; height: min(48vh, 360px); margin-top: 16px; background: #10191b; border: 1px solid var(--line); }
+@media (max-width: 700px) { .symbol-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .solid-preview { height: 260px; } }

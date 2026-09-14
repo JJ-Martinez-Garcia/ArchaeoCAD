@@ -4,6 +4,7 @@ import {
   ChangeEvent,
   PointerEvent as ReactPointerEvent,
   WheelEvent,
+  type SetStateAction,
   useEffect,
   useMemo,
   useRef,
@@ -23,8 +24,13 @@ import {
   toSvg,
 } from "./cad-core";
 import { RasterOptions, vectorizeRaster } from "./raster-vectorizer";
+import { mirror as mirrorEntity, offsetPolyline, rotate as rotateEntity, scale as scaleEntity, translate as translateEntity } from "./geometry-kernel";
+import { archaeologySymbols, symbolEntity } from "./symbol-library";
+import { extrudePrimitive, projectIsometric } from "./solid-kernel";
+import { convertDwgToDxf, dwgBridge, inspectDwg } from "./dwg-bridge";
+import { freehandOutline, unionPolygons, textOutline } from "./external-vector-tools";
 
-const APP_VERSION = "v36";
+const APP_VERSION = "v58";
 
 type VectorCategory = "draw" | "modify" | "geometry" | "precision" | "organize";
 type VectorTool = "select" | "point" | "line" | "polyline" | "polygon" | "rectangle" | "circle" | "arc" | "move" | "copy" | "rotate" | "scale" | "mirror" | "offset" | "vertices" | "trim" | "extend" | "split" | "join" | "explode" | "snap" | "ortho" | "grid" | "coordinates" | "layers" | "properties" | "order";
@@ -700,7 +706,29 @@ function warningText(value: string, lang: Lang) {
 
 export default function ArqueoCadMobile() {
   const [lang, setLang] = useState<Lang>("es");
-  const [drawing, setDrawing] = useState<Drawing | null>(null);
+  const [drawing, setDrawingRaw] = useState<Drawing | null>(null);
+  const historyRef = useRef<Drawing[]>([]);
+  const futureRef = useRef<Drawing[]>([]);
+  const setDrawing = (next: SetStateAction<Drawing | null>) => {
+    setDrawingRaw((current) => {
+      const resolved = typeof next === "function" ? next(current) : next;
+      if (resolved !== current && current) historyRef.current = [...historyRef.current.slice(-49), current];
+      if (resolved !== current) futureRef.current = [];
+      return resolved;
+    });
+  };
+  const undoDrawing = () => {
+    const previous = historyRef.current.pop();
+    if (!previous) return;
+    setDrawingRaw((current) => { if (current) futureRef.current.push(current); return previous; });
+    setToast(lang === "es" ? "Cambio deshecho" : "Change undone");
+  };
+  const redoDrawing = () => {
+    const next = futureRef.current.pop();
+    if (!next) return;
+    setDrawingRaw((current) => { if (current) historyRef.current.push(current); return next; });
+    setToast(lang === "es" ? "Cambio rehecho" : "Change redone");
+  };
   const [recentProjects, setRecentProjects] = useState<RecentProject[]>(() => {
     if (typeof window === "undefined") return [];
     try {
@@ -724,6 +752,11 @@ export default function ArqueoCadMobile() {
   const [measureMode, setMeasureMode] = useState(false);
   const [measurePoints, setMeasurePoints] = useState<Point[]>([]);
   const [exportOpen, setExportOpen] = useState(false);
+  const [libraryOpen, setLibraryOpen] = useState(false);
+  const [view3dOpen, setView3dOpen] = useState(false);
+  const [dwgInfo, setDwgInfo] = useState<{ version: string; release: string; size: number } | null>(null);
+  const [dwgConverting, setDwgConverting] = useState(false);
+  const [dwgFile, setDwgFile] = useState<File | null>(null);
   const [exportMode, setExportMode] = useState<"layers" | "filtered">("layers");
   const [exportFormats, setExportFormats] = useState({ dxf: true, svg: true });
   const [draggingFile, setDraggingFile] = useState(false);
@@ -734,7 +767,9 @@ export default function ArqueoCadMobile() {
   const [simplify, setSimplify] = useState(0.6);
   const [detail, setDetail] = useState<RasterOptions["detail"]>(2);
   const [classifyLines, setClassifyLines] = useState(true);
-  const [ocrEnabled, setOcrEnabled] = useState(true);
+  // OCR is opt-in: loading the language model can take tens of seconds on a
+  // phone and must never block the normal raster vectorization workflow.
+  const [ocrEnabled, setOcrEnabled] = useState(false);
   const [detectScale, setDetectScale] = useState(true);
   const [scaleBarLength, setScaleBarLength] = useState("8");
   const [realWidth, setRealWidth] = useState("");
@@ -755,6 +790,16 @@ export default function ArqueoCadMobile() {
   const rawCopy = { ...(lang === "es" ? copy.es : lang === "en" ? copy.en : lang === "ar" ? copy.ar : { ...copy.es, ...(languageOverrides[lang] ?? {}) }), ...(uiLocaleOverrides[lang] ?? {}) };
   const t: Copy = Object.fromEntries(Object.entries(rawCopy).map(([key, value]) => [key, typeof value === "string" ? value.replaceAll("ArqueoCAD", "ArchaeoCAD") : value])) as Copy;
   const vt = { ...(lang === "en" ? vectorToolsCopy.en : vectorToolsCopy.es), ...(vectorLocaleOverrides[lang] ?? {}), ...(vectorTermOverrides[lang] ?? {}) };
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (!(event.ctrlKey || event.metaKey)) return;
+      if (event.key.toLowerCase() === "z") { event.preventDefault(); event.shiftKey ? redoDrawing() : undoDrawing(); }
+      if (event.key.toLowerCase() === "y") { event.preventDefault(); redoDrawing(); }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [lang]);
 
   useEffect(() => {
     if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js", { updateViaCache: "none" }).then((registration) => registration.update()).catch(() => undefined);
@@ -888,6 +933,31 @@ export default function ArqueoCadMobile() {
     setRecentProjects((current) => current.filter((project) => project.id !== id));
   }
 
+  function addSymbol(symbolId: string) {
+    if (!drawing) return;
+    const symbol = archaeologySymbols.find((item) => item.id === symbolId);
+    if (!symbol) return;
+    const layer = drawing.layers.find((candidate) => !candidate.auxiliary)?.name ?? "01_ESTRUCTURAS";
+    const entity = symbolEntity(symbol, layer, drawing.layers.find((candidate) => candidate.name === layer)?.color);
+    setDrawing((current) => current ? { ...current, primitives: [...current.primitives, entity] } : current);
+    setSelectedEntityIds([entity.id]);
+    setLibraryOpen(false);
+    setToast(lang === "es" ? `Símbolo añadido: ${symbol.name.split(" /")[0]}` : `Symbol added: ${symbol.name.split(" /")[1] ?? symbol.name}`);
+  }
+
+  async function convertDwg() {
+    const input = dwgFile;
+    if (!input) { setToast(lang === "es" ? "Vuelve a seleccionar el archivo DWG" : "Select the DWG file again"); return; }
+    setDwgConverting(true);
+    try {
+      const bytes = await convertDwgToDxf(input);
+      const url = URL.createObjectURL(new Blob([bytes], { type: "application/dxf" }));
+      const anchor = document.createElement("a"); anchor.href = url; anchor.download = `${input.name.replace(/\.dwg$/i, "")}.dxf`; anchor.click(); URL.revokeObjectURL(url);
+      setToast(lang === "es" ? "DXF convertido y descargado" : "DXF converted and downloaded");
+    } catch { setToast(lang === "es" ? "No se pudo convertir este DWG en el navegador" : "This DWG could not be converted in the browser"); }
+    finally { setDwgConverting(false); }
+  }
+
   function openRecentProject(project: RecentProject) {
     if (!project.drawing) {
       setToast(t.projectUnavailable);
@@ -907,7 +977,7 @@ export default function ArqueoCadMobile() {
     setClassifyLines(true);
     // OCR remains available through the checkbox, but is opt-in on phones so
     // the first vectorization is not delayed by downloading language data.
-    setOcrEnabled(!compactDevice);
+    setOcrEnabled(false);
     setDetectScale(true);
     setScaleBarLength("8");
     setRealWidth("");
@@ -929,6 +999,8 @@ export default function ArqueoCadMobile() {
       return;
     }
     if (extension === "dwg") {
+      setDwgFile(file);
+      setDwgInfo(await inspectDwg(file));
       setDwgOpen(true);
       return;
     }
@@ -973,6 +1045,9 @@ export default function ArqueoCadMobile() {
       loadDrawing(next);
       setToast(`${t.rasterReady}: ${next.primitives.length} ${t.entities}`);
     } catch {
+      // Do not leave the raster dialog covering the error toast: on mobile
+      // that looked like a frozen vectorizer and prevented a retry.
+      closeRaster();
       setToast(t.noLines);
     } finally {
       setVectorizing(false);
@@ -1042,12 +1117,12 @@ export default function ArqueoCadMobile() {
       setToast(`${vt.order}: ${vt.ready.toLowerCase()}`);
       return;
     }
-    if (tool === "move") { transformSelected((entity) => ({ ...entity, points: entity.points?.map((point) => ({ x: point.x + 1, y: point.y + 1 })), center: entity.center ? { x: entity.center.x + 1, y: entity.center.y + 1 } : undefined }), `${vt.move}: +1, +1`); return; }
+    if (tool === "move") { transformSelected((entity) => translateEntity(entity as never, { x: 1, y: 1 }) as unknown as Primitive, `${vt.move}: +1, +1`); return; }
     if (tool === "copy") {
       if (!selectedEntityIds.length) { setToast(`${vt.hint}.`); return; }
       setDrawing((current) => {
         if (!current) return current;
-        const copies = current.primitives.filter((entity) => selectedEntityIds.includes(entity.id)).map((entity) => ({ ...entity, id: newEntityId("copy"), points: entity.points?.map((point) => ({ x: point.x + 2, y: point.y + 2 })), center: entity.center ? { x: entity.center.x + 2, y: entity.center.y + 2 } : undefined }));
+        const copies = current.primitives.filter((entity) => selectedEntityIds.includes(entity.id)).map((entity) => ({ ...translateEntity(entity as never, { x: 2, y: 2 }) as unknown as Primitive, id: newEntityId("copy") }));
         return { ...current, primitives: [...current.primitives, ...copies] };
       });
       setToast(vt.copy);
@@ -1059,16 +1134,12 @@ export default function ArqueoCadMobile() {
         const angle = tool === "rotate" ? Math.PI / 2 : 0;
         const factor = tool === "scale" ? 1.15 : 1;
         const mirror = tool === "mirror";
-        const mapPoint = (point: Point) => {
-          const x = (point.x - pivot.x) * (mirror ? -factor : factor);
-          const y = (point.y - pivot.y) * factor;
-          return { x: pivot.x + x * Math.cos(angle) - y * Math.sin(angle), y: pivot.y + x * Math.sin(angle) + y * Math.cos(angle) };
-        };
-        return { ...entity, points: entity.points?.map(mapPoint), center: entity.center ? mapPoint(entity.center) : undefined, rotation: entity.rotation !== undefined && tool === "rotate" ? entity.rotation + 90 : entity.rotation, radius: entity.radius ? entity.radius * factor : entity.radius };
+        const transformed = tool === "rotate" ? rotateEntity(entity as never, pivot, angle) : tool === "scale" ? scaleEntity(entity as never, pivot, factor) : mirrorEntity(entity as never, { x: pivot.x - 1, y: pivot.y }, { x: pivot.x + 1, y: pivot.y });
+        return { ...transformed as unknown as Primitive, rotation: entity.rotation !== undefined && tool === "rotate" ? entity.rotation + 90 : entity.rotation };
       }, vt[tool]);
       return;
     }
-    if (tool === "offset") { transformSelected((entity) => ({ ...entity, points: entity.points?.map((point) => ({ x: point.x + 0.5, y: point.y - 0.5 })), center: entity.center ? { x: entity.center.x + 0.5, y: entity.center.y - 0.5 } : undefined }), `${vt.offset}: 0.5`); return; }
+    if (tool === "offset") { transformSelected((entity) => ({ ...entity, points: entity.points ? offsetPolyline(entity.points, 0.5, entity.closed) : entity.points }), `${vt.offset}: 0.5`); return; }
     if (tool === "explode") {
       if (!selectedEntityIds.length) { setToast(`${vt.hint}.`); return; }
       setDrawing((current) => {
@@ -1116,7 +1187,9 @@ export default function ArqueoCadMobile() {
           const ordered = reverse ? [...next].reverse() : next;
           return [...joined, ...ordered.slice(Math.hypot(end.x - ordered[0].x, end.y - ordered[0].y) < 0.001 ? 1 : 0)];
         }, [...(first.points ?? [])]);
-        const joined = { ...first, id: newEntityId("joined"), points };
+        const closedRings = selected.filter((entity) => entity.closed && entity.points).map((entity) => entity.points!);
+        const union = closedRings.length === selected.length ? unionPolygons(closedRings) : [];
+        const joined = { ...first, id: newEntityId("joined"), points: union[0]?.length ? union[0] : points, closed: Boolean(union[0]?.length) || first.closed };
         return { ...current, primitives: [...current.primitives.filter((entity) => !selectedEntityIds.includes(entity.id)), joined] };
       });
       setSelectedEntityIds([]);
@@ -1173,7 +1246,33 @@ export default function ArqueoCadMobile() {
     else if (vectorTool === "line" && points.length === 2) finish({ ...common, type: "polyline", points, lineType: "continuous" });
     else if (vectorTool === "rectangle" && points.length === 2) { const [a, b] = points; finish({ ...common, type: "polyline", points: [{ x: a.x, y: a.y }, { x: b.x, y: a.y }, { x: b.x, y: b.y }, { x: a.x, y: b.y }, { x: a.x, y: a.y }], closed: true }); }
     else if (vectorTool === "circle" && points.length === 2) finish({ ...common, type: "circle", center: points[0], radius: Math.hypot(points[1].x - points[0].x, points[1].y - points[0].y) });
-    else if (vectorTool === "arc" && points.length === 3) finish({ ...common, type: "polyline", points: [points[0], points[1], points[2]], closed: false });
+    else if (vectorTool === "arc" && points.length === 3) {
+      const [start, through, end] = points;
+      const determinant = 2 * (start.x * (through.y - end.y) + through.x * (end.y - start.y) + end.x * (start.y - through.y));
+      if (Math.abs(determinant) < 1e-6) {
+        finish({ ...common, type: "polyline", points: [start, through, end], closed: false });
+      } else {
+        const startSq = start.x ** 2 + start.y ** 2;
+        const throughSq = through.x ** 2 + through.y ** 2;
+        const endSq = end.x ** 2 + end.y ** 2;
+        const center = {
+          x: (startSq * (through.y - end.y) + throughSq * (end.y - start.y) + endSq * (start.y - through.y)) / determinant,
+          y: (startSq * (end.x - through.x) + throughSq * (start.x - end.x) + endSq * (through.x - start.x)) / determinant,
+        };
+        const radius = Math.hypot(start.x - center.x, start.y - center.y);
+        const angle = (p: Point) => Math.atan2(p.y - center.y, p.x - center.x);
+        const a0 = angle(start); const am = angle(through); const a1 = angle(end);
+        const ccwDistance = (a1 - a0 + Math.PI * 2) % (Math.PI * 2);
+        const middleOnCcw = (am - a0 + Math.PI * 2) % (Math.PI * 2) < ccwDistance;
+        const sweep = middleOnCcw ? ccwDistance : ccwDistance - Math.PI * 2;
+        const steps = Math.max(12, Math.ceil(Math.abs(sweep) * 18));
+        const arcPoints = Array.from({ length: steps + 1 }, (_, index) => {
+          const current = a0 + sweep * index / steps;
+          return { x: center.x + Math.cos(current) * radius, y: center.y + Math.sin(current) * radius };
+        });
+        finish({ ...common, type: "polyline", points: arcPoints, closed: false, smooth: true });
+      }
+    }
     else if ((vectorTool === "polyline" || vectorTool === "polygon") && points.length >= 3 && vectorTool === "polygon") finish({ ...common, type: "polyline", points: [...points, points[0]], closed: true });
     else setDraftPoints(points);
   }
@@ -1339,12 +1438,14 @@ export default function ArqueoCadMobile() {
           <button disabled={!drawing} className={activePanel === "layers" ? "active" : ""} onClick={() => setActivePanel(activePanel === "layers" ? null : "layers")}><span className="tool-glyph layers-glyph">▤</span><small>{t.layers}</small></button>
           <button disabled={!drawing} className={measureMode ? "active" : ""} onClick={() => { setMeasureMode((current) => !current); setActivePanel(null); }}><span className="tool-glyph">⌁</span><small>{t.measure}</small></button>
           <button disabled={!drawing} className={activePanel === "warnings" ? "active" : ""} onClick={() => setActivePanel(activePanel === "warnings" ? null : "warnings")}><span className="tool-glyph warning-glyph">!</span><small>{t.warnings}</small>{Boolean(drawing?.warnings.length) && <span className="notification-count">{drawing?.warnings.length}</span>}</button>
+          <button disabled={!drawing} onClick={() => setLibraryOpen(true)}><span className="tool-glyph">◇</span><small>{lang === "es" ? "Símbolos" : "Symbols"}</small></button>
+          <button disabled={!drawing} onClick={() => setView3dOpen(true)}><span className="tool-glyph">▱</span><small>{lang === "es" ? "Vista 3D" : "3D view"}</small></button>
           <div className="rail-spacer" />
           <button disabled={!drawing} onClick={resetView}><span className="tool-glyph">⌗</span><small>{t.fit}</small></button>
         </nav>
 
         {!drawing ? <section className="cover-area">
-          <div className="cover-hero"><img className="cover-image" src="/og.png" alt="ArchaeoCAD Mobile, planimetría de excavación" /><div className="cover-scrim" /><div className="cover-copy"><span className="eyebrow">{t.coverEyebrow}</span><h1>{t.coverTitle}</h1><p>{t.coverBody}</p><div className="cover-actions"><button className="primary-button" onClick={() => planInputRef.current?.click()}>＋ {t.open}</button><button className="cover-secondary" onClick={() => rasterInputRef.current?.click()}>▧ {t.vectorize}</button></div><small className="cover-formats">{t.coverFormats}</small><div className="cover-private"><span className="status-dot" />{t.privateNote}</div></div></div>
+          <div className="cover-hero"><img className="cover-image" src="./og.png" alt="ArchaeoCAD Mobile, planimetría de excavación" /><div className="cover-scrim" /><div className="cover-copy"><span className="eyebrow">{t.coverEyebrow}</span><h1>{t.coverTitle}</h1><p>{t.coverBody}</p><div className="cover-actions"><button className="primary-button" onClick={() => planInputRef.current?.click()}>＋ {t.open}</button><button className="cover-secondary" onClick={() => rasterInputRef.current?.click()}>▧ {t.vectorize}</button></div><small className="cover-formats">{t.coverFormats}</small><div className="cover-private"><span className="status-dot" />{t.privateNote}</div></div></div>
           <section className="recent-projects" aria-label={t.projects}><div className="recent-projects-heading"><strong>{t.projects}</strong><span>{recentProjects.length}/8</span></div>{recentProjects.length ? <div className="recent-project-list">{recentProjects.map((project) => <article key={project.id} className="recent-project"><button className="recent-project-main" onClick={() => openRecentProject(project)} title={project.drawing ? t.openProject : t.projectUnavailable} disabled={!project.drawing}><strong title={project.name}>{project.name.replace(/\.[^.]+$/, "")}</strong><small>{project.format} · {project.entities} {t.entities} · {project.layers} {t.layers.toLowerCase()}</small></button><button onClick={() => deleteRecentProject(project.id)} aria-label={`${t.deleteProject}: ${project.name}`} title={t.deleteProject}>×</button></article>)}</div> : <p className="recent-project-empty">{t.noProjects}</p>}</section>
         </section> : <>
           <section className="canvas-area" aria-label={t.drawing}>
@@ -1379,7 +1480,7 @@ export default function ArqueoCadMobile() {
 
       <footer className="license-footer"><span>{t.footerText}</span><strong><a href="http://josejaviermartinez.com/digital-laboratory/" target="_blank" rel="noreferrer">Laboratorio Digital</a></strong><small className="app-version-footer">{APP_VERSION}</small></footer>
 
-      <nav className="mobile-nav" aria-label={t.mobileTools}><button onClick={() => planInputRef.current?.click()}><span>＋</span>{t.openShort}</button><button onClick={() => rasterInputRef.current?.click()}><span>▧</span>{t.vectorizeShort}</button><button disabled={!drawing} onClick={() => void saveProjectToDevice()}><span>⇩</span>{t.saveProject}</button><button disabled={!drawing} className={activePanel === "layers" ? "active" : ""} onClick={() => setActivePanel(activePanel === "layers" ? null : "layers")}><span>▤</span>{t.layers}</button><button disabled={!drawing} className={measureMode ? "measure-fab active" : "measure-fab"} onClick={() => { setMeasureMode((value) => !value); setActivePanel(null); }}><span>⌁</span>{t.measure}</button><button disabled={!drawing} onClick={() => setActivePanel(activePanel === "warnings" ? null : "warnings")}><span>!</span>{t.warnings}</button><button disabled={!drawing} onClick={() => setExportOpen(true)}><span>⇩</span>{t.export}</button></nav>
+      <nav className="mobile-nav" aria-label={t.mobileTools}><button onClick={() => planInputRef.current?.click()}><span>＋</span>{t.openShort}</button><button onClick={() => rasterInputRef.current?.click()}><span>▧</span>{t.vectorizeShort}</button><button disabled={!drawing} onClick={undoDrawing} title={lang === "es" ? "Deshacer" : "Undo"}><span>↶</span>{lang === "es" ? "Deshacer" : "Undo"}</button><button disabled={!drawing} onClick={redoDrawing} title={lang === "es" ? "Rehacer" : "Redo"}><span>↷</span>{lang === "es" ? "Rehacer" : "Redo"}</button><button disabled={!drawing} onClick={() => void saveProjectToDevice()}><span>⇩</span>{t.saveProject}</button><button disabled={!drawing} className={activePanel === "layers" ? "active" : ""} onClick={() => setActivePanel(activePanel === "layers" ? null : "layers")}><span>▤</span>{t.layers}</button><button disabled={!drawing} className={measureMode ? "measure-fab active" : "measure-fab"} onClick={() => { setMeasureMode((value) => !value); setActivePanel(null); }}><span>⌁</span>{t.measure}</button><button disabled={!drawing} onClick={() => setActivePanel(activePanel === "warnings" ? null : "warnings")}><span>!</span>{t.warnings}</button><button disabled={!drawing} onClick={() => setExportOpen(true)}><span>⇩</span>{t.export}</button></nav>
 
       {drawing && measureMode && measurePoints.length > 0 && <section className="measurement-card"><div><span>{t.length}</span><strong>{metrics.length.toFixed(2)} {drawing.unit === "metros" ? "m" : "u"}</strong></div>{measurePoints.length > 2 && <><div><span>{t.area}</span><strong>{metrics.area.toFixed(2)} {drawing.unit === "metros" ? "m²" : "u²"}</strong></div><div><span>{t.perimeter}</span><strong>{metrics.perimeter.toFixed(2)} {drawing.unit === "metros" ? "m" : "u"}</strong></div></>}{measurePoints.length > 1 && <div><span>{t.azimuth}</span><strong>{metrics.azimuth.toFixed(1)}°</strong></div>}<button onClick={() => setMeasurePoints((points) => points.slice(0, -1))}>{t.undo}</button><button onClick={() => setMeasurePoints([])}>{t.clear}</button></section>}
 
@@ -1391,7 +1492,9 @@ export default function ArqueoCadMobile() {
 
       {rasterJob && <div className="modal-backdrop"><section className="raster-modal" role="dialog" aria-modal="true" aria-labelledby="raster-title"><div className="modal-heading"><div><span className="eyebrow">{rasterJob.file.name}</span><h2 id="raster-title">{t.rasterTitle}</h2></div><button onClick={closeRaster} aria-label={t.close}>×</button></div><p className="raster-intro">{t.rasterIntro}</p><div className="raster-layout"><div><span className="field-label">{t.sourceImage}</span><div className="raster-preview"><img src={rasterJob.url} alt={rasterJob.file.name} style={{ filter: `grayscale(1) contrast(${1 + threshold / 90})` }} /><span>{t.rasterFeature}</span></div><div className="raster-feature"><b>⌁</b><p><strong>{t.rasterFeature}</strong>{t.rasterFeatureBody}</p></div></div><div className="raster-controls"><fieldset><legend>{t.detection}</legend><label className="range-field"><span><b>{t.threshold}</b><output>{threshold}</output></span><input type="range" min="70" max="230" value={threshold} onChange={(event) => setThreshold(Number(event.target.value))} /><small>{t.thresholdHelp}</small></label><label className="range-field"><span><b>{t.simplify}</b><output>{simplify.toFixed(1)}</output></span><input type="range" min="0.2" max="3" step="0.2" value={simplify} onChange={(event) => setSimplify(Number(event.target.value))} /><small>{t.simplifyHelp}</small></label><label className="select-field"><span>{t.detail}</span><select value={detail} onChange={(event) => setDetail(Number(event.target.value) as RasterOptions["detail"])}><option value="3">{t.detailHigh}</option><option value="2">{t.detailBalanced}</option><option value="1">{t.detailFast}</option></select></label><label className="option-line raster-option"><input type="checkbox" checked={classifyLines} onChange={() => setClassifyLines((value) => !value)} /><span className="custom-check">✓</span><span><b>{t.classify}</b><small>{t.classifyHelp}</small></span></label><label className="option-line raster-option"><input type="checkbox" checked={ocrEnabled} onChange={() => setOcrEnabled((value) => !value)} /><span className="custom-check">✓</span><span><b>{t.ocr}</b><small>{t.ocrHelp}</small></span></label></fieldset><fieldset><legend>{t.calibration}</legend><div className="calibration-grid"><label><span>{t.realWidth}</span><input type="number" min="0" step="any" value={realWidth} onChange={(event) => setRealWidth(event.target.value)} placeholder={t.widthPlaceholder} /></label><label><span>{t.unit}</span><select value={rasterUnit} onChange={(event) => setRasterUnit(event.target.value as RasterOptions["unit"])}><option value="m">m</option><option value="cm">cm</option><option value="mm">mm</option><option value="unit">u</option></select></label></div><small>{t.noCalibration}</small><label className="option-line raster-option"><input type="checkbox" checked={detectScale} onChange={() => setDetectScale((value) => !value)} /><span className="custom-check">✓</span><span><b>{t.detectScale}</b><small>{t.scaleHelp}</small></span></label>{detectScale && <div className="calibration-grid"><label><span>{t.scaleLength}</span><input type="number" min="0" step="any" value={scaleBarLength} onChange={(event) => setScaleBarLength(event.target.value)} /></label><label><span>{t.unit}</span><output className="unit-output">{rasterUnit === "unit" ? "u" : rasterUnit}</output></label></div>}</fieldset></div></div><div className="modal-actions"><button className="secondary-button" onClick={closeRaster} disabled={vectorizing}>{t.cancel}</button><button className="primary-button" onClick={() => void runVectorizer()} disabled={vectorizing}>{vectorizing ? <><span className="spinner" />{t.processing}</> : <>⌁ {t.process}</>}</button></div></section></div>}
 
-      {dwgOpen && <div className="modal-backdrop"><section className="export-modal small-modal" role="dialog" aria-modal="true"><div className="dwg-symbol">DWG</div><h2>{t.dwgTitle}</h2><p>{t.dwgBody}</p><a className="primary-button" href="https://www.opendesign.com/guestfiles/oda_file_converter" target="_blank" rel="noreferrer">ODA File Converter</a><button className="secondary-button" onClick={() => setDwgOpen(false)}>{t.cancel}</button></section></div>}
+      {dwgOpen && <div className="modal-backdrop"><section className="export-modal small-modal" role="dialog" aria-modal="true"><div className="dwg-symbol">DWG</div><h2>{t.dwgTitle}</h2><p>{t.dwgBody}</p>{dwgInfo && <div className="dwg-inspection"><strong>{dwgInfo.release}</strong><small>{dwgInfo.version} · {(dwgInfo.size / 1024).toFixed(1)} KB</small></div>}<small>{lang === "es" ? "Conversión directa local con LibreDWG-WASM:" : "Local direct conversion with LibreDWG-WASM:"}</small><button className="primary-button" onClick={() => void convertDwg()} disabled={dwgConverting}>{dwgConverting ? (lang === "es" ? "Convirtiendo…" : "Converting…") : (lang === "es" ? "Convertir a DXF aquí" : "Convert to DXF here")}</button><small>{dwgBridge.note}</small><a className="secondary-button" href={dwgBridge.converterUrl} target="_blank" rel="noreferrer">ODA File Converter</a><button className="secondary-button" onClick={() => setDwgOpen(false)}>{t.cancel}</button></section></div>}
+      {libraryOpen && drawing && <div className="modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) setLibraryOpen(false); }}><section className="export-modal symbol-modal" role="dialog" aria-modal="true" aria-labelledby="symbols-title"><div className="modal-heading"><div><span className="eyebrow">FREECAD-LIBRARY · CAD</span><h2 id="symbols-title">{lang === "es" ? "Biblioteca arqueológica" : "Archaeology library"}</h2></div><button onClick={() => setLibraryOpen(false)} aria-label={t.close}>×</button></div><p>{lang === "es" ? "Inserta símbolos paramétricos en la capa activa y edítalos con las herramientas vectoriales." : "Insert parametric symbols into the active layer and edit them with vector tools."}</p><div className="symbol-grid">{archaeologySymbols.map((symbol) => <button key={symbol.id} className="symbol-card" onClick={() => addSymbol(symbol.id)}><svg viewBox="-1 -1 8 6" aria-hidden="true"><polyline points={symbol.points.map((point) => `${point.x},${-point.y + 4}`).join(" ")} fill="none" stroke="currentColor" strokeWidth="0.16" /></svg><strong>{lang === "es" ? symbol.name.split(" /")[0] : (symbol.name.split("/")[1] ?? symbol.name)}</strong><small>{symbol.description}</small></button>)}</div><div className="modal-actions"><button className="secondary-button" onClick={() => setLibraryOpen(false)}>{t.close}</button></div></section></div>}
+      {view3dOpen && drawing && <div className="modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) setView3dOpen(false); }}><section className="export-modal view3d-modal" role="dialog" aria-modal="true" aria-labelledby="view3d-title"><div className="modal-heading"><div><span className="eyebrow">OPENCASCADE · CADQUERY</span><h2 id="view3d-title">{lang === "es" ? "Vista 3D experimental" : "Experimental 3D view"}</h2></div><button onClick={() => setView3dOpen(false)} aria-label={t.close}>×</button></div><p>{lang === "es" ? "Extrusión local de polígonos cerrados. La geometría original 2D permanece intacta." : "Local extrusion of closed polygons. Original 2D geometry remains unchanged."}</p><svg className="solid-preview" viewBox="-120 -90 240 180" role="img" aria-label="3D preview">{drawing.primitives.flatMap((entity) => extrudePrimitive(entity, Math.max(1, bounds.height / 30)).map((face, index) => { const pts = face.points.map((point) => { const projected = projectIsometric(point, 1); return `${projected.x},${projected.y}`; }).join(" "); return <polygon key={`${entity.id}-${index}`} points={pts} fill={face.kind === "top" ? "rgba(214,163,75,.3)" : "rgba(77,153,161,.28)"} stroke="#ffd166" strokeWidth="0.7" />; }))}</svg><div className="modal-actions"><button className="secondary-button" onClick={() => setView3dOpen(false)}>{t.close}</button></div></section></div>}
       {draggingFile && <div className="drop-overlay"><div><span>＋</span><h2>{t.drop}</h2><p>{t.dropFormats}</p></div></div>}
       {toast && <div className="toast" role="status"><span>✓</span>{toast}</div>}
     </main>

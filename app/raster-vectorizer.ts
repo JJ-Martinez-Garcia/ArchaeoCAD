@@ -3,6 +3,7 @@ import type { Drawing, Layer, Point, Primitive } from "./cad-core";
 import { BinaryImageConverter, ensureVTracer } from "./vtracer/browser";
 import { recognizeRasterText } from "./ocr";
 import type { OcrText } from "./ocr";
+import { smoothWithPaper } from "./external-vector-tools";
 
 export type RasterOptions = {
   threshold: number;
@@ -32,6 +33,7 @@ type PathFeature = {
   layer: string;
   dashed: boolean;
   confidence: number;
+  colourHint?: "green" | "purple" | "black" | "neutral";
 };
 
 let vtracerSerial = 0;
@@ -95,7 +97,20 @@ function normaliseGray(pixels: Uint8ClampedArray) {
   for (let index = 0; index < gray.length; index += 1) {
     const offset = index * 4;
     const alpha = pixels[offset + 3] / 255;
-    const value = Math.round((pixels[offset] * 0.2126 + pixels[offset + 1] * 0.7152 + pixels[offset + 2] * 0.0722) * alpha + 255 * (1 - alpha));
+    const red = pixels[offset];
+    const green = pixels[offset + 1];
+    const blue = pixels[offset + 2];
+    const luminance = (red * 0.2126 + green * 0.7152 + blue * 0.0722) * alpha + 255 * (1 - alpha);
+    // Archaeological plans are often colour-coded (green UEs, purple
+    // trenches) on a white background. A luminance-only threshold loses the
+    // pale purple strokes, so boost chromatic contrast while leaving neutral
+    // paper shadows unchanged.
+    const chroma = Math.max(red, green, blue) - Math.min(red, green, blue);
+    // Pale green/purple ink can be nearly as bright as the paper. Boost
+    // chroma so coloured archaeological layers are still treated as ink.
+    const colourBoost = Math.max(0, chroma - 8) * 1.18;
+    const colourInk = chroma >= 14 ? Math.max(0, 178 - chroma * 1.6) : 255;
+    const value = Math.round(Math.max(0, Math.min(luminance - colourBoost, colourInk)));
     gray[index] = value;
     histogram[value] += 1;
   }
@@ -108,8 +123,11 @@ function normaliseGray(pixels: Uint8ClampedArray) {
     }
     return 255;
   };
-  const low = percentile(0.03);
-  const high = Math.max(low + 20, percentile(0.985));
+  // Do not use a 3% low percentile: fine archaeological linework often
+  // occupies less than that, which made `low` become 255 and turned the whole
+  // raster black. Anchor the stretch to the darkest half-percent instead.
+  const low = Math.min(220, percentile(0.005));
+  const high = Math.max(low + 20, percentile(0.995));
   const range = high - low;
   for (let index = 0; index < gray.length; index += 1) gray[index] = Math.max(0, Math.min(255, Math.round((gray[index] - low) * 255 / range)));
   return gray;
@@ -200,9 +218,41 @@ function adaptiveBinary(gray: Uint8Array, width: number, height: number, globalT
   return cleaned;
 }
 
-function thin(binary: Uint8Array, width: number, height: number) {
+// Scanned plans often have a bright paper background with antialiased grey
+// strokes. Adaptive thresholding can reject those strokes when the local
+// window is dominated by paper. Keep a conservative global fallback so the
+// vectorizer never reports “no lines” merely because the first threshold was
+// too strict.
+function hasInk(binary: Uint8Array) {
+  let ink = 0;
+  for (const value of binary) ink += value;
+  return ink;
+}
+
+function robustBinary(gray: Uint8Array, width: number, height: number, threshold: number) {
+  const primary = adaptiveBinary(gray, width, height, threshold);
+  const density = hasInk(primary) / Math.max(1, gray.length);
+  // A dark scan or an over-aggressive local threshold can mark the paper as
+  // ink. That creates one giant connected component which the frame stripper
+  // quite correctly removes, leaving no drawing. Fall back to a conservative
+  // global threshold before that happens.
+  if (density > 0.72) {
+    const conservative = new Uint8Array(gray.length);
+    const global = Math.min(190, Math.max(96, threshold - 18));
+    for (let index = 0; index < gray.length; index += 1) conservative[index] = gray[index] < global ? 1 : 0;
+    if (hasInk(conservative) > 0 && hasInk(conservative) < gray.length * 0.72) return conservative;
+  }
+  const minimumInk = Math.max(24, Math.round(gray.length * 0.00005));
+  if (hasInk(primary) >= minimumInk) return primary;
+  // The upper bound keeps light shadows out while recovering faint printed
+  // lines and JPEG antialiasing in photographs of plans.
+  const fallback = adaptiveBinary(gray, width, height, Math.max(threshold + 28, 205));
+  return hasInk(fallback) > hasInk(primary) ? fallback : primary;
+}
+
+function thin(binary: Uint8Array, width: number, height: number, maxIterations = 64) {
   const data = binary.slice();
-  for (let iteration = 0; iteration < 64; iteration += 1) {
+  for (let iteration = 0; iteration < maxIterations; iteration += 1) {
     let changed = false;
     for (let pass = 0; pass < 2; pass += 1) {
       const remove: number[] = [];
@@ -240,6 +290,9 @@ function thin(binary: Uint8Array, width: number, height: number) {
 function tracePaths(data: Uint8Array, width: number, height: number) {
   const visited = new Uint8Array(data.length);
   const paths: number[][] = [];
+  // Dense scans can contain millions of edge traversals. Bound the work per
+  // raster so a malformed/very thick component cannot freeze a mobile PWA.
+  let traversalBudget = Math.max(12000, data.length * 6);
   const mark = (a: number, direction: number, b: number) => {
     visited[a] |= 1 << direction;
     visited[b] |= 1 << ((direction + 4) % 8);
@@ -247,11 +300,13 @@ function tracePaths(data: Uint8Array, width: number, height: number) {
   const seen = (index: number, direction: number) => Boolean(visited[index] & (1 << direction));
 
   function follow(start: number, first: Neighbour) {
+    if (traversalBudget <= 0) return;
     const path = [start, first.index];
     mark(start, first.direction, first.index);
     let previous = start;
     let current = first.index;
     for (let guard = 0; guard < data.length; guard += 1) {
+      if (--traversalBudget <= 0) break;
       const currentNeighbours = neighbourEntries(data, width, height, current);
       const options = currentNeighbours.filter((next) => next.index !== previous && !seen(current, next.direction));
       if (!options.length || (current !== first.index && currentNeighbours.length !== 2)) break;
@@ -275,6 +330,30 @@ function tracePaths(data: Uint8Array, width: number, height: number) {
   for (let index = 0; index < data.length; index += 1) {
     if (!data[index]) continue;
     neighbourEntries(data, width, height, index).forEach((next) => { if (!seen(index, next.direction)) follow(index, next); });
+  }
+  return paths;
+}
+
+// Last-resort scanline tracing for noisy JPEGs. A skeleton can occasionally
+// lose all graph edges when a scan contains touching anti-aliased strokes;
+// retaining the contiguous runs still produces separate editable segments
+// instead of failing with “No lines detected”. Runs are deliberately short
+// and independent so neighbouring drawings cannot be joined into one path.
+function scanlineFallback(data: Uint8Array, width: number, height: number) {
+  const paths: number[][] = [];
+  const maxPaths = 24000;
+  for (let y = 0; y < height && paths.length < maxPaths; y += 1) {
+    let x = 0;
+    while (x < width && paths.length < maxPaths) {
+      while (x < width && !data[y * width + x]) x += 1;
+      const start = x;
+      while (x < width && data[y * width + x]) x += 1;
+      if (x - start >= 2) {
+        const path: number[] = [];
+        for (let px = start; px < x; px += 1) path.push(y * width + px);
+        paths.push(path);
+      }
+    }
   }
   return paths;
 }
@@ -359,6 +438,59 @@ function pathFeature(pixels: number[], width: number): PathFeature {
   };
 }
 
+function colourHintForPath(path: number[], rgba: Uint8ClampedArray): PathFeature["colourHint"] {
+  let green = 0;
+  let purple = 0;
+  let chromatic = 0;
+  let samples = 0;
+  const stride = 4;
+  const step = Math.max(1, Math.floor(path.length / 48));
+  for (let i = 0; i < path.length; i += step) {
+    const offset = path[i] * stride;
+    if (offset < 0 || offset + 2 >= rgba.length) continue;
+    const r = rgba[offset];
+    const g = rgba[offset + 1];
+    const b = rgba[offset + 2];
+    const max = Math.max(r, g, b);
+    const min = Math.min(r, g, b);
+    const c = max - min;
+    if (c < 12) continue;
+    chromatic += 1;
+    if (g > r * 1.08 && g > b * 1.03) green += 1;
+    if (r > g * 1.04 && b > g * 1.02) purple += 1;
+    samples += 1;
+  }
+  if (!samples || chromatic / Math.max(1, samples) < 0.35) return "neutral";
+  if (green >= purple && green / samples > 0.28) return "green";
+  if (purple / samples > 0.28) return "purple";
+  return "neutral";
+}
+
+function splitColourMasks(binary: Uint8Array, rgba: Uint8ClampedArray) {
+  const masks = [new Uint8Array(binary.length), new Uint8Array(binary.length), new Uint8Array(binary.length)];
+  let chromatic = 0;
+  for (let index = 0; index < binary.length; index += 1) {
+    if (!binary[index]) continue;
+    const offset = index * 4;
+    const r = rgba[offset];
+    const g = rgba[offset + 1];
+    const b = rgba[offset + 2];
+    const max = Math.max(r, g, b);
+    const min = Math.min(r, g, b);
+    const chroma = max - min;
+    if (chroma >= 9 && g > r * 1.03 && g > b * 1.01) {
+      masks[0][index] = 1;
+      chromatic += 1;
+    } else if (chroma >= 9 && r > g * 1.02 && b > g * 1.01) {
+      masks[1][index] = 1;
+      chromatic += 1;
+    } else {
+      masks[2][index] = 1;
+    }
+  }
+  return chromatic >= Math.max(12, binary.length * 0.0001) ? masks : [binary];
+}
+
 function angleDistance(a: number, b: number) {
   const distance = Math.abs(a - b) % Math.PI;
   return Math.min(distance, Math.PI - distance);
@@ -387,7 +519,11 @@ function classify(features: PathFeature[], width: number, height: number) {
     const symbolLike = feature.closed && size > diagonal * 0.008 && size < diagonal * 0.11
       && (feature.roundness > 0.48 || (feature.points.length >= 8 && feature.meanTurn > 0.32));
     const textLike = feature.closed && !symbolLike && feature.points.length >= 6 && size < diagonal * 0.026 && feature.meanTurn > 0.22;
-    if (inScale || inNorth) {
+    if (feature.colourHint === "green") {
+      feature.layer = "02_CURVAS_NIVEL";
+    } else if (feature.colourHint === "purple") {
+      feature.layer = "04_EJES_SECCIONES";
+    } else if (inScale || inNorth) {
       feature.layer = "07_ESCALA_NORTE";
     } else if (nearBorder) {
       feature.layer = "09_MARCO_LEYENDA";
@@ -533,6 +669,22 @@ function raf() {
     : (callback: FrameRequestCallback) => window.setTimeout(() => callback(performance.now()), 0);
 }
 
+async function segmentInWorker(binary: Uint8Array, width: number, height: number): Promise<number[][] | null> {
+  if (typeof Worker === "undefined") return null;
+  return new Promise((resolve) => {
+    const worker = new Worker(new URL("./raster-components-worker.ts", import.meta.url), { type: "module" });
+    const timeout = window.setTimeout(() => { worker.terminate(); resolve(null); }, 8000);
+    worker.onmessage = (event: MessageEvent<{ components: number[][] }>) => {
+      window.clearTimeout(timeout);
+      worker.terminate();
+      resolve(event.data.components);
+    };
+    worker.onerror = () => { window.clearTimeout(timeout); worker.terminate(); resolve(null); };
+    const transferable = binary.slice();
+    worker.postMessage({ width, height, pixels: transferable.buffer }, [transferable.buffer]);
+  });
+}
+
 function ocrPrimitives(texts: OcrText[], width: number, height: number, scale: number): Primitive[] {
   return texts.map((text, index) => ({
     id: `ocr-${index}`,
@@ -546,6 +698,28 @@ function ocrPrimitives(texts: OcrText[], width: number, height: number, scale: n
     confidence: Math.min(0.99, Math.max(0, text.confidence / 100)),
     lineWeight: layerPresets["08_TEXTOS_EDITABLES"].lineWeight,
   }));
+}
+
+function geometryQualityWarnings(primitives: Primitive[]) {
+  const warnings: string[] = [];
+  let open = 0;
+  let tiny = 0;
+  const signatures = new Set<string>();
+  let duplicate = 0;
+  primitives.forEach((primitive) => {
+    if (primitive.type !== "polyline" || !primitive.points || primitive.points.length < 2) return;
+    const first = primitive.points[0];
+    const last = primitive.points[primitive.points.length - 1];
+    if (primitive.closed !== true && Math.hypot(first.x - last.x, first.y - last.y) < 2) open += 1;
+    if (primitive.points.length < 3) tiny += 1;
+    const signature = primitive.points.slice(0, 4).map((point) => `${point.x.toFixed(1)},${point.y.toFixed(1)}`).join(";");
+    if (signatures.has(signature)) duplicate += 1;
+    signatures.add(signature);
+  });
+  if (open) warnings.push(`Control de calidad: ${open} trazos casi cerrados deben revisarse.`);
+  if (tiny) warnings.push(`Control de calidad: ${tiny} trazos tienen menos de tres puntos.`);
+  if (duplicate) warnings.push(`Control de calidad: ${duplicate} trazos parecen duplicados.`);
+  return warnings;
 }
 
 type RasterSource = CanvasImageSource & { close?: () => void };
@@ -580,6 +754,10 @@ async function decodeRaster(file: File): Promise<{ source: RasterSource; width: 
 }
 
 async function vectorizeWithVTracer(binary: Uint8Array, width: number, height: number, file: File, options: RasterOptions, detectedScalePixels: number | null, ocrTexts: OcrText[]): Promise<Drawing | null> {
+  // Fast and balanced modes use the responsive local tracer. WASM spline
+  // tracing is reserved for maximum detail so a normal conversion cannot be
+  // held up by WebAssembly initialization or a slow browser WebView.
+  if (options.detail !== 3) return null;
   const serial = vtracerSerial += 1;
   const canvas = document.createElement("canvas");
   const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
@@ -673,6 +851,7 @@ async function vectorizeWithVTracer(binary: Uint8Array, width: number, height: n
         "Vectorización VTracer (WebAssembly) con trazado suavizado; revisa el resultado antes de usarlo como documentación definitiva.",
         ...(options.ocr ? [ocrTexts.length ? `OCR: ${ocrTexts.length} textos añadidos a 08_TEXTOS_EDITABLES.` : "OCR no ha encontrado textos con confianza suficiente; revisa el escaneado."] : []),
         ...(ambiguous ? [`${ambiguous} trazos tienen baja confianza de clasificación y conviene revisarlos.`] : []),
+        ...geometryQualityWarnings(primitives),
       ],
     };
   } catch {
@@ -689,7 +868,7 @@ export async function vectorizeRaster(file: File, options: RasterOptions): Promi
   const bitmap = decoded.source;
   // Keep the default workload bounded on phones while retaining a selectable
   // maximum-detail mode for desktop review.
-  const detailLimit = options.detail === 3 ? 1300 : options.detail === 2 ? 1000 : 700;
+  const detailLimit = options.detail === 3 ? 1300 : options.detail === 2 ? 1000 : 420;
   const reduction = Math.min(1, detailLimit / Math.max(decoded.width, decoded.height));
   const width = Math.max(1, Math.round(decoded.width * reduction));
   const height = Math.max(1, Math.round(decoded.height * reduction));
@@ -705,8 +884,9 @@ export async function vectorizeRaster(file: File, options: RasterOptions): Promi
   decoded.revoke?.();
   const initialGray = normaliseGray(context.getImageData(0, 0, width, height).data);
   deskewCanvas(canvas, estimateSkewAngle(initialGray, width, height));
-  const gray = normaliseGray(context.getImageData(0, 0, width, height).data);
-  const rawBinary = adaptiveBinary(gray, width, height, options.threshold);
+  const processedRgba = context.getImageData(0, 0, width, height).data;
+  const gray = normaliseGray(processedRgba);
+  const rawBinary = robustBinary(gray, width, height, options.threshold);
   // Keep the frame out of the connected-component graph so A/B/C (or rooms
   // in an archaeological plan) remain separate editable paths.
   const binary = stripImageFrame(rawBinary, width, height);
@@ -714,10 +894,37 @@ export async function vectorizeRaster(file: File, options: RasterOptions): Promi
   const ocrTexts = options.ocr ? await recognizeRasterText(canvas) : [];
   const vtracerDrawing = await vectorizeWithVTracer(binary, width, height, file, options, detectedScalePixels, ocrTexts);
   if (vtracerDrawing) return vtracerDrawing;
-  const skeleton = thin(binary, width, height);
-  const traced = tracePaths(skeleton, width, height);
+  // Avoid the expensive 48-pass thinning loop in fast/mobile mode. Tracing
+  // the cleaned binary mask directly is responsive and still preserves every
+  // coloured stroke; balanced/maximum retain centreline thinning.
+  // Cap thinning work for responsive mobile/desktop conversion. The previous
+  // 64 passes could monopolise the main thread on 1000px scans and make the
+  // modal appear stuck even though detection was still running.
+  const skeleton = thin(binary, width, height, options.detail === 1 ? 4 : options.detail === 2 ? 12 : 24);
+  // Trace chromatic masks independently so adjacent green/purple drawings do
+  // not become one connected CAD path when their anti-aliased pixels touch.
+  // Split the *original* cleaned mask before thinning. Thinning first can
+  // erase pale anti-aliased coloured strokes (especially in JPEG scans),
+  // causing the classifier to report no lines or merge the remaining regions.
+  const masks = splitColourMasks(binary, processedRgba);
+  const traced: number[][] = [];
+  for (const mask of masks) {
+    const maskForTrace = options.detail === 1 ? thin(mask, width, height, 4) : thin(mask, width, height, options.detail === 2 ? 12 : 24);
+    const components = options.detail === 1 ? await segmentInWorker(maskForTrace, width, height) : null;
+    if (components?.length) {
+      components.forEach((component) => {
+        const isolated = new Uint8Array(maskForTrace.length);
+        component.forEach((index) => { isolated[index] = 1; });
+        traced.push(...tracePaths(isolated, width, height));
+      });
+    } else traced.push(...tracePaths(maskForTrace, width, height));
+  }
   const minimumPixels = options.detail === 3 ? 2 : options.detail === 2 ? 3 : 4;
-  const features = traced.filter((path) => path.length >= minimumPixels).map((path) => pathFeature(path, width));
+  const features = traced.filter((path) => path.length >= minimumPixels).map((path) => {
+    const feature = pathFeature(path, width);
+    feature.colourHint = colourHintForPath(path, processedRgba);
+    return feature;
+  });
   const ambiguous = options.classify ? classify(features, width, height) : 0;
   if (!options.classify) features.forEach((feature) => { feature.layer = "01_LINEAS_VECTOR"; });
 
@@ -733,6 +940,26 @@ export async function vectorizeRaster(file: File, options: RasterOptions): Promi
     automaticScale = true;
   }
 
+  // If thinning/graph tracing produced no paths, recover independent
+  // scanline segments from the cleaned raster. This is especially useful for
+  // pale coloured JPEG plans and guarantees a useful editable result.
+  if (!features.length) {
+    let recoveryMask = binary;
+    if (hasInk(recoveryMask) < Math.max(24, Math.round(gray.length * 0.00005))) {
+      recoveryMask = new Uint8Array(gray.length);
+      // JPEG plans often contain grey/coloured strokes above the adaptive
+      // threshold. Recover them from the normalized luminance directly.
+      for (let index = 0; index < gray.length; index += 1) recoveryMask[index] = gray[index] < 235 ? 1 : 0;
+    }
+    const fallbackPaths = scanlineFallback(recoveryMask, width, height);
+    fallbackPaths.forEach((path) => {
+      const feature = pathFeature(path, width);
+      feature.colourHint = colourHintForPath(path, processedRgba);
+      if (options.classify) classify([feature], width, height);
+      else feature.layer = "01_LINEAS_VECTOR";
+      features.push(feature);
+    });
+  }
   const primitives: Primitive[] = features.map((feature, index) => {
     const preset = layerPresets[feature.layer];
     const points = feature.points.map((point) => ({ x: point.x * scale, y: (height - point.y) * scale }));
@@ -741,15 +968,19 @@ export async function vectorizeRaster(file: File, options: RasterOptions): Promi
       type: "polyline",
       layer: feature.layer,
       color: preset.color,
-      points: simplifyPath(points, Math.max(0.08, options.simplify) * scale),
+      points: simplifyPath(feature.points.length >= 4 ? smoothWithPaper(points, Math.max(0.15, options.simplify) * scale) : points, Math.max(0.08, options.simplify) * scale),
       closed: feature.closed,
       lineType: feature.dashed ? "dashed" : "continuous",
       lineWeight: preset.lineWeight,
+      smooth: feature.points.length >= 4,
       confidence: options.classify ? feature.confidence : 1,
     };
   }).filter((entity) => (entity.points?.length ?? 0) >= 2);
   primitives.push(...ocrPrimitives(ocrTexts, width, height, scale));
-  if (!primitives.length) throw new Error("No lines detected");
+  if (!primitives.length) {
+    console.info("[ArchaeoCAD vectorizer] no primitives", { width, height, rawInk: hasInk(rawBinary), binaryInk: hasInk(binary), features: features.length });
+    throw new Error("No lines detected");
+  }
 
   const counts = new Map<string, number>();
   primitives.forEach((primitive) => counts.set(primitive.layer, (counts.get(primitive.layer) ?? 0) + 1));
@@ -765,6 +996,7 @@ export async function vectorizeRaster(file: File, options: RasterOptions): Promi
   if (ambiguous) warnings.push(`${ambiguous} trazos tienen baja confianza de clasificación y conviene revisarlos.`);
   if (automaticScale) warnings.push(`Escala calibrada automáticamente con una barra gráfica de ${options.scaleBarLength} ${unitName(options.unit)}.`);
   else if (!calibrated) warnings.push("La imagen no se ha calibrado: las medidas se expresan en píxeles/unidades de dibujo.");
+  warnings.push(...geometryQualityWarnings(primitives));
   return {
     name: file.name.replace(/\.[^.]+$/, "") + "_vectorizado.dxf",
     format: "RASTER",

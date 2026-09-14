@@ -19,12 +19,12 @@ test("ships ArchaeoCAD as a multilingual installable mobile application", async 
   assert.match(page, /measurePoints/);
   assert.match(page, /El archivo se procesa solo en este dispositivo/);
   assert.match(page, /From the field to a layered drawing/);
-  assert.match(page, /src="\/og\.png"/);
+  assert.match(page, /src="\.\/og\.png"/);
   assert.match(page, /useState<Drawing \| null>\(null\)/);
   assert.match(page, /image\/png,image\/jpeg,image\/webp,image\/bmp/);
   assert.match(page, /Este es un software gratuito y de libre distribución creado por José Javier Martínez/);
   assert.match(page, /http:\/\/josejaviermartinez\.com\/digital-laboratory\//);
-  assert.match(page, /const APP_VERSION = "v36"/);
+  assert.match(page, /const APP_VERSION = "v58"/);
   assert.match(page, /className="language-select"/);
   assert.match(page, /code: "fr", label: "Français"/);
   assert.match(page, /code: "zh", label: "中文"/);
@@ -79,3 +79,4 @@ test("ships ArchaeoCAD as a multilingual installable mobile application", async 
   assert.match(manifest, /icon-maskable-512\.png/);
   assert.match(serviceWorker, /CACHE_NAME/);
 });
+
