@@ -1,0 +1,89 @@
+name: Build ArchaeoCAD releases
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  desktop:
+    name: ${{ matrix.name }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Windows
+            os: windows-latest
+            bundles: msi,nsis
+          - name: macOS
+            os: macos-latest
+            bundles: app,dmg
+          - name: Linux
+            os: ubuntu-22.04
+            bundles: appimage,deb,rpm
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+      - run: pnpm install --frozen-lockfile
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Install Linux dependencies
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+      - name: Build native bundle
+        run: npm run tauri build -- --bundles ${{ matrix.bundles }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ArchaeoCAD-${{ matrix.name }}
+          path: src-tauri/target/release/bundle/
+
+  android:
+    name: Android AAB
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: android-actions/setup-android@v3
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android,armv7-linux-androideabi,i686-linux-android,x86_64-linux-android
+      - run: pnpm install --frozen-lockfile
+      - run: npx tauri android init
+      - name: Build AAB
+        run: npm run android:aab
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ArchaeoCAD-Android
+          path: src-tauri/gen/android/app/build/outputs/bundle/**/*.aab
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/')
+    needs: [desktop, android]
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: release
+      - uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          files: release/**/*

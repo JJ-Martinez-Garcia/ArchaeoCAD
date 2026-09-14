@@ -52,6 +52,19 @@ npm run dev
 npm run build
 ```
 
+## Aplicaciones instalables
+
+ArchaeoCAD comparte esta interfaz web con las aplicaciones nativas mediante **Tauri 2**. La configuración está en `src-tauri/` y no duplica el código de `app/`.
+
+```bash
+npm install
+npm run tauri:dev       # probar la aplicación nativa
+npm run tauri:build     # instalador del sistema actual
+npm run android:aab     # AAB de Android (requiere Android Studio/SDK)
+```
+
+El workflow `.github/workflows/release.yml` compila Windows (MSI/NSIS), macOS (APP/DMG), Linux (AppImage/DEB/RPM) y Android (AAB). Los instaladores se conservan como artefactos o en **Releases** de GitHub; no se guardan en el repositorio. Las firmas de Android, Windows y macOS deben configurarse después mediante secretos de GitHub Actions.
+
 ## Derechos y licencias
 
 Copyright © José Javier Martínez García. ArchaeoCAD se distribuye como software libre bajo los términos de la **GNU General Public License v3.0 (GPL-3.0)**, conforme al proyecto original. Consulta el aviso de licencia del repositorio en [LICENSE](./LICENSE) y el texto completo en [gnu.org](https://www.gnu.org/licenses/gpl-3.0.html).
@@ -68,4 +81,3 @@ Los créditos y avisos de terceros deben conservarse al redistribuir una compila
 - [opentype.js](https://github.com/opentypejs/opentype.js): MIT; [earcut](https://github.com/mapbox/earcut): ISC.
 
 La aplicación procesa los archivos localmente en el dispositivo; no se envían planos a un servidor de ArchaeoCAD. Las licencias de cada dependencia prevalecen sobre esta nota cuando se distribuyen sus propios componentes.
-
