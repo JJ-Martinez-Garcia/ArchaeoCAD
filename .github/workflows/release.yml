@@ -30,7 +30,6 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: npm
       - uses: pnpm/action-setup@v4
         with:
           version: 11
@@ -40,7 +39,7 @@ jobs:
         if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
       - name: Build native bundle
-        run: npm run tauri build -- --bundles ${{ matrix.bundles }}
+        run: npm tauri build -- --bundles ${{ matrix.bundles }}
       - uses: actions/upload-artifact@v4
         with:
           name: ArchaeoCAD-${{ matrix.name }}
@@ -54,7 +53,6 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: npm
       - uses: pnpm/action-setup@v4
         with:
           version: 11
@@ -67,9 +65,9 @@ jobs:
         with:
           targets: aarch64-linux-android,armv7-linux-androideabi,i686-linux-android,x86_64-linux-android
       - run: pnpm install --frozen-lockfile
-      - run: npx tauri android init
+      - run: pnpm exec tauri android init
       - name: Build AAB
-        run: npm run android:aab
+        run: pnpm android:aab
       - uses: actions/upload-artifact@v4
         with:
           name: ArchaeoCAD-Android
