@@ -27,7 +27,7 @@
   "bundle": {
     "active": true,
     "targets": ["msi", "nsis", "app", "dmg", "appimage", "deb", "rpm"],
-    "category": "GraphicsAndPhotography",
+    "category": "Graphics and Design",
     "shortDescription": "Visor, editor y vectorizador de planos arqueológicos",
     "longDescription": "ArchaeoCAD convierte, edita y organiza planos arqueológicos en el dispositivo.",
     "copyright": "Copyright © José Javier Martínez García",
