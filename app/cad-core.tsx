@@ -301,6 +301,19 @@ export function parseDxf(text: string, name: string): Drawing {
   const pairs = parsePairs(text);
   if (!pairs.length) throw new Error("DXF vacío o no válido");
   const allRecords = recordsFrom(pairs);
+  const blockMap = new Map<string, DxfPair[][]>();
+  let activeBlock: { name: string; records: DxfPair[][] } | null = null;
+  allRecords.forEach((record) => {
+    const recordType = valueOf(record, 0).toUpperCase();
+    if (recordType === "BLOCK") {
+      activeBlock = { name: valueOf(record, 2, "").trim(), records: [] };
+    } else if (recordType === "ENDBLK" && activeBlock) {
+      if (activeBlock.name) blockMap.set(activeBlock.name, activeBlock.records);
+      activeBlock = null;
+    } else if (activeBlock) {
+      activeBlock.records.push(record);
+    }
+  });
   const layerMap = new Map<string, Layer>();
   allRecords.filter((record) => valueOf(record, 0) === "LAYER").forEach((record) => {
     const layerName = valueOf(record, 2, "0");
@@ -350,8 +363,17 @@ export function parseDxf(text: string, name: string): Drawing {
     } else if (type === "HATCH") {
       // HATCH boundary vertices use the same 10/20 coordinate pairs. Keeping
       // each boundary as a closed polyline avoids the old single-line overlay.
-      const points = pointsFromPairs(record);
-      if (points.length >= 2) primitives.push({ ...common, type: "polyline", sourceType: type, points, closed: true });
+      const boundaries: DxfPair[][] = [];
+      let boundary: DxfPair[] = [];
+      record.forEach((pair) => {
+        if (pair.code === 92 && boundary.length) { boundaries.push(boundary); boundary = []; }
+        boundary.push(pair);
+      });
+      if (boundary.length) boundaries.push(boundary);
+      const candidates = boundaries.map((part) => pointsFromPairs(part)).filter((points) => points.length >= 2);
+      (candidates.length ? candidates : [pointsFromPairs(record)]).forEach((points) => {
+        if (points.length >= 2) primitives.push({ ...common, type: "polyline", sourceType: type, points, closed: true });
+      });
     } else if (type === "CIRCLE" || type === "ARC") {
       const center = { x: numberOf(record, 10), y: numberOf(record, 20) };
       const radius = Math.abs(numberOf(record, 40, 1));
@@ -369,7 +391,11 @@ export function parseDxf(text: string, name: string): Drawing {
     } else if (type === "POINT") {
       primitives.push({ ...common, type: "point", sourceType: type, center: { x: numberOf(record, 10), y: numberOf(record, 20) } });
     } else if (type === "INSERT") {
-      primitives.push({ ...common, type: "point", sourceType: type, blockName: valueOf(record, 2, "BLOQUE"), center: { x: numberOf(record, 10), y: numberOf(record, 20) } });
+      const blockName = valueOf(record, 2, "BLOQUE");
+      // Keep a marker when the block definition is unavailable. Known blocks
+      // are expanded below into their original linework instead of appearing
+      // as a single point on top of the whole drawing.
+      if (!blockMap.has(blockName)) primitives.push({ ...common, type: "point", sourceType: type, blockName, center: { x: numberOf(record, 10), y: numberOf(record, 20) } });
     } else if (type === "TEXT" || type === "MTEXT") {
       const pieces = record.filter((pair) => pair.code === 1 || pair.code === 3).map((pair) => pair.value);
       primitives.push({ ...common, type: "text", sourceType: type, center: { x: numberOf(record, 10), y: numberOf(record, 20) }, text: pieces.join("").replace(/\\P/g, " "), height: numberOf(record, 40, 1), rotation: numberOf(record, 50) });
@@ -381,8 +407,37 @@ export function parseDxf(text: string, name: string): Drawing {
       primitives.push({ ...common, type: "polyline", points, closed: true });
     }
   });
+  const transformBlockPoint = (point: Point, insert: DxfPair[]) => {
+    const sx = numberOf(insert, 41, 1); const sy = numberOf(insert, 42, sx);
+    const angle = numberOf(insert, 50) * Math.PI / 180;
+    const x = point.x * sx; const y = point.y * sy;
+    return { x: numberOf(insert, 10) + x * Math.cos(angle) - y * Math.sin(angle), y: numberOf(insert, 20) + x * Math.sin(angle) + y * Math.cos(angle) };
+  };
+  allRecords.filter((record) => valueOf(record, 0).toUpperCase() === "INSERT").forEach((insert, insertIndex) => {
+    const blockName = valueOf(insert, 2, ""); const definition = blockMap.get(blockName);
+    if (!definition) return;
+    const layerName = valueOf(insert, 8, "0"); const layer = layerMap.get(layerName); const color = layer?.color ?? "#d7d2c7";
+    if (layer) layer.count += definition.length;
+    definition.forEach((record, entityIndex) => {
+      const type = valueOf(record, 0).toUpperCase(); const common = { id: `block-${insertIndex}-${entityIndex}`, layer: layerName, color, sourceType: `INSERT:${blockName}`, blockName };
+      if (type === "LINE") {
+        primitives.push({ ...common, type: "polyline", points: [transformBlockPoint({ x: numberOf(record, 10), y: numberOf(record, 20) }, insert), transformBlockPoint({ x: numberOf(record, 11), y: numberOf(record, 21) }, insert)] });
+      } else if (type === "LWPOLYLINE") {
+        const points = pointsFromPairs(record).map((point) => transformBlockPoint(point, insert));
+        if (points.length) primitives.push({ ...common, type: "polyline", points, closed: (Math.trunc(numberOf(record, 70)) & 1) === 1 });
+      } else if (type === "CIRCLE") {
+        const center = transformBlockPoint({ x: numberOf(record, 10), y: numberOf(record, 20) }, insert);
+        primitives.push({ ...common, type: "circle", center, radius: Math.abs(numberOf(record, 40, 1) * Math.abs(numberOf(insert, 41, 1))) });
+      } else if (type === "TEXT" || type === "MTEXT") {
+        const pieces = record.filter((pair) => pair.code === 1 || pair.code === 3).map((pair) => pair.value);
+        primitives.push({ ...common, type: "text", center: transformBlockPoint({ x: numberOf(record, 10), y: numberOf(record, 20) }, insert), text: pieces.join("").replace(/\\P/g, " "), height: numberOf(record, 40, 1) * Math.abs(numberOf(insert, 41, 1)) });
+      }
+    });
+  });
   const unsupported = allRecords.filter((record) => ["ELLIPSE"].includes(valueOf(record, 0))).length;
   if (unsupported) warnings.push(`${unsupported} elipses se muestran simplificadas; el resto de entidades complejas se ha convertido a geometría editable.`);
+  const externalRefs = allRecords.filter((record) => valueOf(record, 0).toUpperCase() === "XREF" || valueOf(record, 2).toUpperCase() === "XREF").length;
+  if (externalRefs) warnings.push(`${externalRefs} referencias externas requieren el archivo de origen para mostrarse completamente.`);
   const insUnitsRecord = allRecords.find((record) => record.some((pair) => pair.code === 9 && pair.value === "$INSUNITS"));
   const unitCode = insUnitsRecord ? numberOf(insUnitsRecord, 70, 0) : 0;
   const unit = ({ 1: "pulgadas", 4: "milímetros", 5: "centímetros", 6: "metros" } as Record<number, string>)[unitCode] ?? "unidades de dibujo";
