@@ -2,7 +2,7 @@ export const dwgBridge = {
   name: "LibreDWG / ODA bridge",
   status: "external-converter",
   supportedInput: ["DWG"],
-  note: "La PWA detecta DWG y ofrece conversión compatible; LibreDWG requiere un backend/WASM compilado por plataforma.",
+  note: "La web y Android usan LibreDWG-WASM; la aplicación Tauri intenta primero OpenCADStudio instalado localmente y vuelve a LibreDWG si no está disponible.",
   converterUrl: "https://www.opendesign.com/guestfiles/oda_file_converter",
 };
 
@@ -23,4 +23,11 @@ export async function convertDwgToDxf(file: File): Promise<Uint8Array> {
   const result = converter.dwg_write_dxf(await file.arrayBuffer());
   if (!result) throw new Error("DWG conversion failed");
   return result instanceof Uint8Array ? result : new Uint8Array(result);
+}
+
+export async function convertDwgToDxfNative(file: File): Promise<Uint8Array> {
+  const internals = (window as Window & { __TAURI_INTERNALS__?: { invoke?: (command: string, args?: unknown) => Promise<unknown> } }).__TAURI_INTERNALS__;
+  if (!internals?.invoke) throw new Error("Tauri API unavailable");
+  const bytes = await internals.invoke("convert_dwg_with_opencadstudio", { input: Array.from(new Uint8Array(await file.arrayBuffer())) }) as number[];
+  return new Uint8Array(bytes);
 }

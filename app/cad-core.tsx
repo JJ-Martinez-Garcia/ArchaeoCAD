@@ -28,6 +28,9 @@ export type Primitive = {
   lineWeight?: number;
   /** Export the vertex chain as a native DXF SPLINE when possible. */
   smooth?: boolean;
+  /** Original CAD entity type, retained for diagnostics and export decisions. */
+  sourceType?: string;
+  blockName?: string;
 };
 export type Layer = {
   name: string;
@@ -265,6 +268,35 @@ function dxfColor(record: DxfPair[], layerColor: string) {
   return ACI_COLORS[aci] ?? layerColor;
 }
 
+function pointsFromPairs(record: DxfPair[], xCode = 10, yCode = 20) {
+  const xs = record.filter((pair) => pair.code === xCode).map((pair) => Number.parseFloat(pair.value));
+  const ys = record.filter((pair) => pair.code === yCode).map((pair) => Number.parseFloat(pair.value));
+  return xs.map((x, index) => ({ x, y: ys[index] ?? 0 })).filter((point) => Number.isFinite(point.x) && Number.isFinite(point.y));
+}
+
+function sampleSpline(controlPoints: Point[], degree = 3) {
+  // A stable uniform B-spline approximation keeps CAD curves smooth even when
+  // the browser renderer does not support native SPLINE entities.
+  if (controlPoints.length < 2) return controlPoints;
+  const order = Math.max(1, Math.min(degree, controlPoints.length - 1));
+  const result: Point[] = [];
+  const basis = (i: number, k: number, t: number): number => {
+    if (k === 0) return t >= i && t < i + 1 ? 1 : 0;
+    const left = (t - i) / k * basis(i, k - 1, t);
+    const right = (i + k + 1 - t) / k * basis(i + 1, k - 1, t);
+    return left + right;
+  };
+  const maxT = controlPoints.length - order;
+  const steps = Math.max(24, controlPoints.length * 12);
+  for (let step = 0; step <= steps; step += 1) {
+    const t = Math.min(maxT - 1e-6, (step / steps) * maxT);
+    let x = 0; let y = 0; let weight = 0;
+    controlPoints.forEach((point, index) => { const w = basis(index, order, t); x += point.x * w; y += point.y * w; weight += w; });
+    if (weight > 0) result.push({ x: x / weight, y: y / weight });
+  }
+  return result.length >= 2 ? result : controlPoints;
+}
+
 export function parseDxf(text: string, name: string): Drawing {
   const pairs = parsePairs(text);
   if (!pairs.length) throw new Error("DXF vacío o no válido");
@@ -305,16 +337,25 @@ export function parseDxf(text: string, name: string): Drawing {
     const color = dxfColor(record, layer.color);
     const common = { id: `dxf-${index}`, layer: layerName, color };
     if (type === "LINE") {
-      primitives.push({ ...common, type: "polyline", points: [{ x: numberOf(record, 10), y: numberOf(record, 20) }, { x: numberOf(record, 11), y: numberOf(record, 21) }] });
+      primitives.push({ ...common, type: "polyline", sourceType: type, points: [{ x: numberOf(record, 10), y: numberOf(record, 20) }, { x: numberOf(record, 11), y: numberOf(record, 21) }] });
     } else if (type === "LWPOLYLINE") {
-      const xs = record.filter((pair) => pair.code === 10).map((pair) => Number.parseFloat(pair.value));
-      const ys = record.filter((pair) => pair.code === 20).map((pair) => Number.parseFloat(pair.value));
-      const points = xs.map((x, pointIndex) => ({ x, y: ys[pointIndex] ?? 0 }));
-      if (points.length) primitives.push({ ...common, type: "polyline", points, closed: (Math.trunc(numberOf(record, 70)) & 1) === 1 });
+      const points = pointsFromPairs(record);
+      if (points.length) primitives.push({ ...common, type: "polyline", sourceType: type, points, closed: (Math.trunc(numberOf(record, 70)) & 1) === 1 });
+    } else if (type === "SPLINE") {
+      const controlPoints = pointsFromPairs(record);
+      if (controlPoints.length >= 2) {
+        const points = sampleSpline(controlPoints, Math.trunc(numberOf(record, 71, 3)));
+        primitives.push({ ...common, type: "polyline", sourceType: type, smooth: true, points, closed: (Math.trunc(numberOf(record, 70)) & 1) === 1 });
+      }
+    } else if (type === "HATCH") {
+      // HATCH boundary vertices use the same 10/20 coordinate pairs. Keeping
+      // each boundary as a closed polyline avoids the old single-line overlay.
+      const points = pointsFromPairs(record);
+      if (points.length >= 2) primitives.push({ ...common, type: "polyline", sourceType: type, points, closed: true });
     } else if (type === "CIRCLE" || type === "ARC") {
       const center = { x: numberOf(record, 10), y: numberOf(record, 20) };
       const radius = Math.abs(numberOf(record, 40, 1));
-      if (type === "CIRCLE") primitives.push({ ...common, type: "circle", center, radius });
+      if (type === "CIRCLE") primitives.push({ ...common, type: "circle", sourceType: type, center, radius });
       else {
         const start = numberOf(record, 50) * Math.PI / 180;
         let end = numberOf(record, 51) * Math.PI / 180;
@@ -323,20 +364,25 @@ export function parseDxf(text: string, name: string): Drawing {
           const angle = start + (end - start) * pointIndex / 32;
           return { x: center.x + Math.cos(angle) * radius, y: center.y + Math.sin(angle) * radius };
         });
-        primitives.push({ ...common, type: "polyline", points });
+        primitives.push({ ...common, type: "polyline", sourceType: type, points });
       }
-    } else if (type === "POINT" || type === "INSERT") {
-      primitives.push({ ...common, type: "point", center: { x: numberOf(record, 10), y: numberOf(record, 20) } });
+    } else if (type === "POINT") {
+      primitives.push({ ...common, type: "point", sourceType: type, center: { x: numberOf(record, 10), y: numberOf(record, 20) } });
+    } else if (type === "INSERT") {
+      primitives.push({ ...common, type: "point", sourceType: type, blockName: valueOf(record, 2, "BLOQUE"), center: { x: numberOf(record, 10), y: numberOf(record, 20) } });
     } else if (type === "TEXT" || type === "MTEXT") {
       const pieces = record.filter((pair) => pair.code === 1 || pair.code === 3).map((pair) => pair.value);
-      primitives.push({ ...common, type: "text", center: { x: numberOf(record, 10), y: numberOf(record, 20) }, text: pieces.join("").replace(/\\P/g, " "), height: numberOf(record, 40, 1), rotation: numberOf(record, 50) });
+      primitives.push({ ...common, type: "text", sourceType: type, center: { x: numberOf(record, 10), y: numberOf(record, 20) }, text: pieces.join("").replace(/\\P/g, " "), height: numberOf(record, 40, 1), rotation: numberOf(record, 50) });
+    } else if (type === "DIMENSION") {
+      const label = valueOf(record, 1, "DIM").replace(/\\X/g, " ");
+      primitives.push({ ...common, type: "text", sourceType: type, center: { x: numberOf(record, 10), y: numberOf(record, 20) }, text: label, height: numberOf(record, 140, numberOf(record, 40, 1)) });
     } else if (type === "SOLID" || type === "3DFACE") {
       const points = [10, 11, 12, 13].map((code) => ({ x: numberOf(record, code), y: numberOf(record, code + 10) }));
       primitives.push({ ...common, type: "polyline", points, closed: true });
     }
   });
-  const unsupported = allRecords.filter((record) => ["SPLINE", "ELLIPSE", "HATCH", "DIMENSION"].includes(valueOf(record, 0))).length;
-  if (unsupported) warnings.push(`${unsupported} entidades complejas se muestran simplificadas; se conservarán al exportar desde la aplicación de escritorio.`);
+  const unsupported = allRecords.filter((record) => ["ELLIPSE"].includes(valueOf(record, 0))).length;
+  if (unsupported) warnings.push(`${unsupported} elipses se muestran simplificadas; el resto de entidades complejas se ha convertido a geometría editable.`);
   const insUnitsRecord = allRecords.find((record) => record.some((pair) => pair.code === 9 && pair.value === "$INSUNITS"));
   const unitCode = insUnitsRecord ? numberOf(insUnitsRecord, 70, 0) : 0;
   const unit = ({ 1: "pulgadas", 4: "milímetros", 5: "centímetros", 6: "metros" } as Record<number, string>)[unitCode] ?? "unidades de dibujo";
@@ -545,8 +591,11 @@ export function toDxf(primitives: Primitive[], unit: string) {
       if (entity.smooth && entity.points.length >= 4) {
         // Degree-3 fit through the sampled centreline. Consumers that do not
         // support SPLINE can still use the same points from the SVG export.
-        add(0, "SPLINE", ...common, 70, entity.closed ? 1 : 0, 71, 3, 72, entity.points.length, 73, 0);
-        entity.points.forEach((point) => add(11, point.x, 21, point.y, 31, 0));
+        const degree = 3;
+        const knotCount = entity.points.length + degree + 1;
+        add(0, "SPLINE", ...common, 70, entity.closed ? 1 : 0, 71, degree, 72, knotCount, 73, entity.points.length);
+        for (let knot = 0; knot < knotCount; knot += 1) add(40, knot < degree + 1 ? 0 : knot - degree);
+        entity.points.forEach((point) => add(10, point.x, 20, point.y, 30, 0));
       } else {
         add(0, "LWPOLYLINE", ...common, 90, entity.points.length, 70, entity.closed ? 1 : 0);
         entity.points.forEach((point) => add(10, point.x, 20, point.y));
